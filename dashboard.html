@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>电脑舰队管理台</title>
+<style>
+  :root{--bg:#0e1319;--card:#182130;--card2:#1f2b3f;--txt:#e8eef5;--dim:#8fa3b8;--ok:#2fbf71;--bad:#e5534b;--warn:#e8a13a;--line:#263449}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px 12px 30px}
+  header{max-width:1100px;margin:0 auto 12px}
+  h1{font-size:21px;font-weight:700}
+  .sub{color:var(--dim);font-size:13px;margin-top:4px}
+  .summary{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px}
+  .pill b{font-size:15px}
+  .grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:640px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:1000px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card.off{opacity:.62}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .cname{font-size:18px;font-weight:700;line-height:1.25}
+  .cid{color:var(--dim);font-size:12px;margin-top:2px}
+  .status{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;white-space:nowrap}
+  .st-on{background:rgba(47,191,113,.16);color:var(--ok)}
+  .st-off{background:rgba(229,83,75,.16);color:var(--bad)}
+  .st-none{background:rgba(143,163,184,.16);color:var(--dim)}
+  .bigcpu{display:flex;align-items:baseline;gap:8px;margin-top:12px}
+  .bigcpu .num{font-size:32px;font-weight:800;line-height:1}
+  .bigcpu .lbl{color:var(--dim);font-size:12px}
+  .bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:6px}
+  .bar>i{display:block;height:100%;border-radius:99px;background:var(--ok)}
+  .bar>i.mid{background:var(--warn)} .bar>i.hi{background:var(--bad)}
+  .rowlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:10px}
+  .rowlbl b{color:var(--txt);font-weight:600}
+  .sec{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  .sec h3{font-size:12px;color:var(--dim);font-weight:600;margin-bottom:7px;letter-spacing:.05em}
+  .task{display:flex;justify-content:space-between;font-size:13px;padding:2.5px 0}
+  .task .tn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+  .task .tv{color:var(--dim);font-variant-numeric:tabular-nums}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12px;border-radius:999px;padding:3.5px 9px;background:var(--card2);border:1px solid var(--line)}
+  .chip.up{color:var(--ok)} .chip.down{color:var(--bad)}
+  .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .chip.up .dot{background:var(--ok)} .chip.down .dot{background:var(--bad)}
+  .foot{color:var(--dim);font-size:11.5px;margin-top:12px;line-height:1.6}
+  .empty{color:var(--dim);font-size:13px;padding:8px 0 2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🖥️ 电脑舰队管理台</h1>
+  <div class="sub" id="sub">加载中…</div>
+  <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a></div>
+  <div class="summary" id="summary"></div>
+  <div id="alertbar" style="display:none;margin-top:10px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.6"></div>
+</header>
+<div class="grid" id="grid"></div>
+<script>
+function gb(n){return (n/1073741824).toFixed(1)+' GB'}
+function pct(n){return n.toFixed(0)+'%'}
+function barCls(v){return v>=90?'hi':(v>=70?'mid':'')}
+function ago(sec){if(sec<0)sec=0;if(sec<60)return sec+' 秒前';if(sec<3600)return Math.floor(sec/60)+' 分钟前';if(sec<86400)return Math.floor(sec/3600)+' 小时前';return Math.floor(sec/86400)+' 天前'}
+function uptimeStr(s){if(!s)return '—';var d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?('已运行 '+d+' 天 '+h+' 小时'):('已运行 '+h+' 小时')}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+
+function cardHTML(m, now){
+  var info=m.info||{}, rep=m.report, last=m.last_seen||0;
+  var has = !!rep;
+  var online = has && m.online;
+  var statusCls = !has ? 'st-none' : (online ? 'st-on' : 'st-off');
+  var statusTxt = !has ? '待接入' : (online ? '● 在线' : '● 离线');
+  var h='';
+  h+='<div class="card'+(has&&!online?' off':'')+'">';
+  h+='<div class="chead"><div><div class="cname">'+esc(info.name||info.id)+'</div><div class="cid">'+esc(info.id)+' · '+esc(info.role||'')+'</div></div><div class="status '+statusCls+'">'+statusTxt+'</div></div>';
+  if(!has){
+    h+='<div class="empty">这台还没有接入监控。</div>';
+  } else if(!rep.agent){
+    h+='<div class="sec"><h3>软件在线情况</h3><div class="chips">';
+    (rep.services||[]).forEach(function(s){h+='<span class="chip '+(s.up?'up':'down')+'"><span class="dot"></span>'+esc(s.name)+(s.detail?' '+esc(s.detail):'')+'</span>'});
+    h+='</div></div>';
+    h+='<div class="foot">远程探测（未装探针） · 更新于 '+ago(now-last)+'</div>';
+  } else {
+    var cpu=rep.cpu||0;
+    h+='<div class="bigcpu"><span class="num">'+pct(cpu)+'</span><span class="lbl">CPU 占用</span></div>';
+    h+='<div class="bar"><i class="'+barCls(cpu)+'" style="width:'+Math.min(100,cpu)+'%"></i></div>';
+    if(rep.mem_total>0){
+      var mp=100*rep.mem_used/rep.mem_total;
+      h+='<div class="rowlbl"><span>内存</span><b>已用 '+gb(rep.mem_used)+' / '+gb(rep.mem_total)+'（'+pct(mp)+'）</b></div>';
+      h+='<div class="bar"><i class="'+barCls(mp)+'" style="width:'+mp+'%"></i></div>';
+    }
+    if((rep.disks||[]).length){
+      h+='<div class="sec"><h3>磁盘可用空间</h3>';
+      rep.disks.forEach(function(d){
+        var usedp=100*(d.total-d.free)/d.total;
+        h+='<div class="rowlbl"><span>'+esc(d.mount)+'</span><b>可用 '+gb(d.free)+' / '+gb(d.total)+'</b></div>';
+        h+='<div class="bar"><i class="'+barCls(usedp)+'" style="width:'+usedp+'%"></i></div>';
+      });
+      h+='</div>';
+    }
+    if((rep.top||[]).length){
+      h+='<div class="sec"><h3>主要工作任务（按 CPU）</h3>';
+      rep.top.forEach(function(t){
+        h+='<div class="task"><span class="tn">'+esc(t.name)+'</span><span class="tv">CPU '+pct(t.cpu)+(t.mem>=1?' · 内存 '+pct(t.mem):'')+'</span></div>';
+      });
+      h+='</div>';
+    }
+    if((rep.services||[]).length){
+      h+='<div class="sec"><h3>软件在线情况</h3><div class="chips">';
+      rep.services.forEach(function(s){h+='<span class="chip '+(s.up?'up':'down')+'"><span class="dot"></span>'+esc(s.name)+'</span>'});
+      h+='</div></div>';
+    }
+    h+='<div class="foot">'+esc(rep.hostname||'')+' · '+esc(rep.os||'')+' · '+uptimeStr(rep.uptime)+'<br>更新于 '+ago(now-last)+'</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function refresh(){
+  fetch('api/state').then(function(r){if(r.status===401){location.href='login';throw new Error('unauth')}return r.json()}).then(function(data){
+    var now=data.now, ms=data.machines||[];
+    var on=0, total=ms.length;
+    ms.forEach(function(m){if(m.report&&m.online)on++});
+    var alerts=ms.filter(function(m){return m.alert});
+    var ab=document.getElementById('alertbar');
+    if(alerts.length){
+      ab.style.display='block';
+      ab.innerHTML='⚠️ <b>告警</b>：'+alerts.map(function(m){return esc(m.info.name)+' 已离线 '+ago(now-(m.last_seen||now))}).join('；');
+    } else { ab.style.display='none'; }
+    document.getElementById('summary').innerHTML='<span class="pill">在线 <b>'+on+'</b> / '+total+' 台</span><span class="pill">每 30 秒自动刷新</span>';
+    document.getElementById('sub').textContent='数据时间：'+new Date(now*1000).toLocaleString('zh-CN',{hour12:false});
+    document.getElementById('grid').innerHTML=ms.map(function(m){return cardHTML(m, now)}).join('');
+  }).catch(function(e){
+    document.getElementById('sub').textContent='刷新失败，稍后自动重试';
+  });
+}
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

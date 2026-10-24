@@ -1,0 +1,7 @@
+fleetmon-linux
+fleetmon-windows.exe
+fleetmon
+deploy-local/
+*.jsonl
+state.json
+dist/

@@ -1,0 +1,11 @@
+[Unit]
+Description=FleetMon central server
+After=network-online.target tailscaled.service
+Wants=network-online.target
+[Service]
+ExecStart=/opt/fleetmon/fleetmon server /opt/fleetmon/server.json
+Restart=always
+RestartSec=5
+User=root
+[Install]
+WantedBy=multi-user.target

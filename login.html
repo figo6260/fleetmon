@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>登录 · 电脑舰队管理台</title>
+<style>
+  :root{--bg:#0e1319;--card:#182130;--txt:#e8eef5;--dim:#8fa3b8;--line:#263449;--accent:#2fbf71;--bad:#e5534b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 24px;width:100%;max-width:340px}
+  h1{font-size:20px;font-weight:700;text-align:center}
+  .sub{color:var(--dim);font-size:13px;text-align:center;margin-top:6px}
+  form{margin-top:22px}
+  label{display:block;font-size:13px;color:var(--dim);margin:14px 0 6px}
+  input{width:100%;background:#0e1319;border:1px solid var(--line);border-radius:10px;color:var(--txt);font-size:17px;padding:12px 14px;-webkit-appearance:none;appearance:none}
+  input:focus{outline:none;border-color:var(--accent)}
+  button{width:100%;margin-top:22px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;padding:13px 0;cursor:pointer;-webkit-appearance:none;appearance:none}
+  .err{background:rgba(229,83,75,.15);color:#ff9d97;border:1px solid rgba(229,83,75,.4);border-radius:10px;font-size:14px;padding:10px 12px;margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>电脑舰队管理台</h1>
+  <div class="sub">请登录后查看各台电脑的状态</div>
+  {{ERR}}
+  <form method="post" action="login">
+    <label for="u">用户名</label>
+    <input id="u" name="user" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+    <label for="p">密码</label>
+    <input id="p" name="pass" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+    <button type="submit">登录</button>
+  </form>
+</div>
+</body>
+</html>
