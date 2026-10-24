@@ -49,6 +49,14 @@ with a mobile-first web dashboard.
   run over a LAN or a mesh VPN (Tailscale / Headscale / WireGuard)
 - systemd units for agent and server in `examples/`
 
+## Screenshots
+
+Desktop and mobile views of the dashboard, with sample data:
+
+<img src="docs/screenshots/dashboard-desktop.png" width="800" alt="FleetMon dashboard on desktop">
+
+<img src="docs/screenshots/dashboard-mobile.png" width="390" alt="FleetMon dashboard on mobile">
+
 中文说明见下方。
 
 ## Architecture
