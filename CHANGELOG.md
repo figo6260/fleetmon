@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.0 — 2026-10-24
+
+### Changed
+
+- Dashboard restyled to gauge panels, replacing the v1.1.0 chart wall:
+  each machine shows CPU, memory, and fullest-disk ring gauges (blue /
+  purple / orange; red at 90% or above, gray when offline), a taller CPU
+  trend line, and the same disk, top-process, and service sections.
+- Dashboard search, filters (all / online / offline / alert, alert first),
+  summary row, and one-click refresh are unchanged.
+
 ## v1.1.0 — 2026-10-24
 
 ### Added

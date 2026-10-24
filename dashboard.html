@@ -5,65 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>电脑舰队管理台</title>
 <style>
-  :root{--bg:#0b0c0e;--panel:#181b1f;--panel2:#1f232a;--txt:#d8dee9;--dim:#8b949e;--grid:#2c2f33;--ok:#2fbf71;--bad:#e5534b;--warn:#e8a13a;--line:#2c2f33}
+  :root{--bg:#0e1319;--card:#182130;--card2:#1f2b3f;--txt:#e8eef5;--dim:#8fa3b8;--ok:#2fbf71;--bad:#e5534b;--warn:#e8a13a;--line:#263449}
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px 12px 30px}
-  header{max-width:1240px;margin:0 auto 12px}
+  header{max-width:1180px;margin:0 auto 12px}
   h1{font-size:21px;font-weight:700}
   .sub{color:var(--dim);font-size:13px;margin-top:4px}
-  .toolbar{max-width:1240px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .toolbar input{flex:1 1 220px;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:8px 12px;font-size:14px;outline:none}
+  .summary{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px}
+  .pill b{font-size:15px}
+  .pill.alert{border-color:var(--bad);color:#ffb4ae}
+  .refreshbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:5px 14px;font-size:13px;cursor:pointer}
+  .toolbar{max-width:1180px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .toolbar input{flex:1 1 220px;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;font-size:14px;outline:none}
   .toolbar input:focus{border-color:var(--dim)}
-  .fbtn{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:6px 13px;font-size:13px;cursor:pointer}
-  .fbtn.on{background:var(--panel2);color:var(--txt);border-color:var(--dim)}
-  .refreshbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer}
-  .statrow{max-width:1240px;margin:0 auto 12px;display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-  @media(max-width:1000px){.statrow{grid-template-columns:repeat(3,1fr)}}
-  @media(max-width:560px){.statrow{grid-template-columns:repeat(2,1fr)}}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-  .stat .lbl{font-size:12px;color:var(--dim)}
-  .stat .val{font-size:26px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
-  .stat .val small{font-size:13px;color:var(--dim);font-weight:400}
-  .stat .val.red{color:var(--bad)} .stat .val.green{color:var(--ok)} .stat .val.yellow{color:var(--warn)}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0 auto 12px;max-width:1240px}
-  .panel.alert{border-color:var(--bad)}
-  .phead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
-  .ptitle{font-size:15px;font-weight:700}
-  .psub{font-size:12px;color:var(--dim);margin-top:2px}
-  .status{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .fbtn{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:6px 13px;font-size:13px;cursor:pointer}
+  .fbtn.on{background:var(--card2);color:var(--txt);border-color:var(--dim)}
+  .grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
+  @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:1200px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card.off{opacity:.62}
+  .card.alert{border-color:var(--bad)}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .cname{font-size:20px;font-weight:700;line-height:1.25}
+  .cid{color:var(--dim);font-size:12px;margin-top:2px}
+  .status{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;white-space:nowrap}
   .st-on{background:rgba(47,191,113,.16);color:var(--ok)}
   .st-off{background:rgba(229,83,75,.16);color:var(--bad)}
   .st-none{background:rgba(143,163,184,.16);color:var(--dim)}
-  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--dim);margin-bottom:8px}
-  .legend span{white-space:nowrap}
-  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
-  .chart{width:100%;display:block}
-  .chart text{font-size:11px;fill:var(--dim)}
-  .pstats{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;margin-bottom:8px}
-  .pstats b{font-variant-numeric:tabular-nums}
-  .machgrid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
-  @media(max-width:900px){.machgrid{grid-template-columns:1fr}}
-  .machgrid .panel{margin:0;max-width:none}
-  .machgrid .panel.off{opacity:.62}
-  .bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:5px}
+  .gauges{display:flex;gap:10px;justify-content:space-between;margin-top:12px}
+  .gauge{flex:1;text-align:center;min-width:0}
+  .gauge svg{width:100%;height:auto;max-width:118px}
+  .gauge .glabel{font-size:13px;color:var(--dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gauge .gsub{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sparkwrap{margin-top:10px}
+  .sparkwrap .cap{font-size:13px;color:var(--dim);margin-bottom:4px}
+  .spark{width:100%;height:52px;display:block}
+  .bar{height:8px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:6px}
   .bar>i{display:block;height:100%;border-radius:99px;background:var(--ok)}
   .bar>i.mid{background:var(--warn)} .bar>i.hi{background:var(--bad)}
-  .rowlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:9px;gap:8px}
+  .bar.thin{height:6px}
+  .rowlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:10px;gap:8px}
   .rowlbl b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .sec{margin-top:10px;border-top:1px solid var(--grid);padding-top:9px}
-  .sec h3{font-size:12px;color:var(--dim);font-weight:600;margin-bottom:6px}
+  .sec{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  .sec h3{font-size:12px;color:var(--dim);font-weight:600;margin-bottom:7px;letter-spacing:.05em}
   .task{display:flex;justify-content:space-between;font-size:13px;padding:2.5px 0;gap:8px}
   .task .tn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .task .tv{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
-  .chip{font-size:12px;border-radius:999px;padding:3.5px 9px;background:var(--panel2);border:1px solid var(--line)}
+  .chip{font-size:12px;border-radius:999px;padding:3.5px 9px;background:var(--card2);border:1px solid var(--line)}
   .chip.up{color:var(--ok)} .chip.down{color:var(--bad)}
   .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
   .chip.up .dot{background:var(--ok)} .chip.down .dot{background:var(--bad)}
-  .foot{color:var(--dim);font-size:11.5px;margin-top:10px;line-height:1.6}
+  .foot{color:var(--dim);font-size:11.5px;margin-top:12px;line-height:1.6}
   .empty{color:var(--dim);font-size:13px;padding:8px 0 2px}
-  .noresult{max-width:1240px;margin:0 auto;color:var(--dim);font-size:14px;padding:24px 4px}
-  #alertbar{display:none;max-width:1240px;margin:0 auto 12px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:8px;padding:9px 12px;font-size:13.5px;line-height:1.6}
+  .noresult{max-width:1180px;margin:0 auto;color:var(--dim);font-size:14px;padding:24px 4px}
 </style>
 </head>
 <body>
@@ -71,6 +68,8 @@
   <h1>🖥️ 电脑舰队管理台</h1>
   <div class="sub" id="sub">加载中…</div>
   <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a></div>
+  <div class="summary" id="summary"></div>
+  <div id="alertbar" style="display:none;margin-top:10px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.6"></div>
 </header>
 <div class="toolbar">
   <input id="q" type="search" placeholder="搜索机器名 / 编号 / 用途…" autocomplete="off">
@@ -78,50 +77,38 @@
   <button class="fbtn" data-f="on">在线</button>
   <button class="fbtn" data-f="off">离线</button>
   <button class="fbtn" data-f="alert">有告警</button>
-  <button class="refreshbtn" onclick="refresh()">立即刷新</button>
-  <span style="font-size:12px;color:var(--dim)">每 30 秒自动刷新 · 趋势图为打开页面后累计</span>
 </div>
-<div id="alertbar"></div>
-<div class="statrow" id="statrow"></div>
-<div class="panel" id="fleetpanel"></div>
-<div class="panel" id="diskpanel"></div>
-<div class="machgrid" id="machgrid"></div>
+<div class="grid" id="grid"></div>
 <div class="noresult" id="noresult" style="display:none">没有匹配的机器，换个关键词或筛选条件试试。</div>
 <script>
 function gb(n){return (n/1073741824).toFixed(1)+' GB'}
 function pct(n){return n.toFixed(0)+'%'}
 function barCls(v){return v>=90?'hi':(v>=70?'mid':'')}
+function ringColor(v, gray){if(gray)return '#8fa3b8';return v>=90?'#e5534b':(v>=70?'#e8a13a':'#2fbf71')}
 function ago(sec){if(sec<0)sec=0;if(sec<60)return sec+' 秒前';if(sec<3600)return Math.floor(sec/60)+' 分钟前';if(sec<86400)return Math.floor(sec/3600)+' 小时前';return Math.floor(sec/86400)+' 天前'}
 function uptimeStr(s){if(!s)return '—';var d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?('已运行 '+d+' 天 '+h+' 小时'):('已运行 '+h+' 小时')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
-var PALETTE=['#2fbf71','#4da3ff','#e8a13a','#b678f0','#e5534b','#2dd4bf','#f472b6','#a3e635'];
 var hist={};
-function pushHist(id, cpu, mem){var a=hist[id]||(hist[id]={cpu:[],mem:[]});a.cpu.push(cpu);a.mem.push(mem);if(a.cpu.length>48){a.cpu.shift();a.mem.shift();}}
-function timeChart(series, h){
-  h=h||150;var W=640,H=h,PL=34,PR=8,PT=8,PB=18,iw=W-PL-PR,ih=H-PT-PB;
-  var s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">';
-  [0,25,50,75,100].forEach(function(v){var y=PT+ih*(100-v)/100;s+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="#2c2f33" stroke-width="1"/><text x="'+(PL-4)+'" y="'+(y+3)+'" text-anchor="end">'+v+'</text>';});
-  series.forEach(function(sr){
-    var pts=sr.points;
-    if(pts.length<2)return;
-    var xy=pts.map(function(v,i){var x=PL+i*iw/Math.max(1,pts.length-1);var y=PT+ih*(100-Math.min(100,Math.max(0,v)))/100;return x.toFixed(1)+','+y.toFixed(1)}).join(' ');
-    s+='<polygon points="'+PL+','+(PT+ih)+' '+xy+' '+(W-PR)+','+(PT+ih)+'" fill="'+sr.color+'" opacity="0.12"/>';
-    s+='<polyline points="'+xy+'" fill="none" stroke="'+sr.color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-  });
-  s+='</svg>';
-  return s;
+function pushHist(id, cpu){var a=hist[id]||(hist[id]=[]);a.push(cpu);if(a.length>24)a.shift();}
+function ringSVG(v, gray, base){
+  var C=188.5, f=C*Math.min(100,Math.max(0,v))/100, col=gray?'#8fa3b8':(v>=90?'#e5534b':base);
+  return '<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="30" fill="none" stroke="#1f2b3f" stroke-width="8"/><circle cx="42" cy="42" r="30" fill="none" stroke="'+col+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C-f).toFixed(1)+'" transform="rotate(-90 42 42)"/><text x="42" y="40" text-anchor="middle" fill="#e8eef5" font-size="15" font-weight="700">'+pct(v)+'</text><text x="42" y="54" text-anchor="middle" fill="#8fa3b8" font-size="9">已用</text></svg>';
 }
-function legendHTML(series){
-  return '<div class="legend">'+series.map(function(sr){return '<span><i style="background:'+sr.color+'"></i>'+esc(sr.label)+' <b style="color:#d8dee9">'+pct(sr.value)+'</b></span>'}).join('')+'</div>';
+function sparkSVG(a, color){
+  if(a.length<2)return '';
+  var w=300,h=52,pad=2, pts=a.map(function(v,i){var x=pad+i*(w-2*pad)/Math.max(1,a.length-1);var y=h-pad-(Math.min(100,Math.max(0,v))/100)*(h-2*pad);return x.toFixed(1)+','+y.toFixed(1)}).join(' ');
+  return '<svg class="spark" viewBox="0 0 300 52" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><polygon points="0,52 '+pts+' 300,52" fill="'+color+'" opacity="0.15"/></svg>';
 }
 
 var curFilter='all', curQuery='';
 document.querySelectorAll('.fbtn').forEach(function(b){b.addEventListener('click',function(){curFilter=b.getAttribute('data-f');document.querySelectorAll('.fbtn').forEach(function(x){x.classList.toggle('on',x===b)});render();});});
 document.getElementById('q').addEventListener('input',function(e){curQuery=e.target.value.trim().toLowerCase();render();});
 var lastData=null;
-function shownMachines(){
-  var ms=(lastData&&lastData.machines)||[], q=curQuery;
+function render(){
+  if(!lastData)return;
+  var now=lastData.now, ms=lastData.machines||[];
+  var q=curQuery;
   var shown=ms.filter(function(m){
     var info=m.info||{};
     if(curFilter==='on'&&!(m.report&&m.online))return false;
@@ -138,56 +125,20 @@ function shownMachines(){
     if(sa!==sb)return sa-sb;
     return String((a.info&&a.info.name)||'').localeCompare(String((b.info&&b.info.name)||''));
   });
-  return shown;
-}
-function render(){
-  if(!lastData)return;
-  var now=lastData.now, shown=shownMachines();
-  var on=0, alerts=0, cpuSum=0, cpuN=0, memSum=0, memN=0, worstDisk=0, worstName='';
-  shown.forEach(function(m){
-    if(m.report&&m.online)on++;
-    if(m.alert)alerts++;
-    if(m.report&&m.report.agent){cpuSum+=m.report.cpu||0;cpuN++;if(m.report.mem_total>0){memSum+=100*m.report.mem_used/m.report.mem_total;memN++;}}
-    (m.report&&m.report.disks||[]).forEach(function(d){var p=d.total>0?100*(d.total-d.free)/d.total:0;if(p>worstDisk){worstDisk=p;worstName=m.info.name;}});
-  });
-  var avgCpu=cpuN?cpuSum/cpuN:0, avgMem=memN?memSum/memN:0;
-  var ab=document.getElementById('alertbar');
-  var alertMs=shown.filter(function(m){return m.alert});
-  if(alertMs.length){
-    ab.style.display='block';
-    ab.innerHTML='⚠️ <b>告警</b>：'+alertMs.map(function(m){return esc(m.info.name)+' 已离线 '+ago(now-(m.last_seen||now))}).join('；');
-  } else { ab.style.display='none'; }
-  document.getElementById('statrow').innerHTML=
-    '<div class="stat"><div class="lbl">在线机器</div><div class="val green">'+on+' <small>/ '+shown.length+' 台</small></div></div>'+
-    '<div class="stat"><div class="lbl">告警机器</div><div class="val '+(alerts?'red':'')+'">'+alerts+' <small>台</small></div></div>'+
-    '<div class="stat"><div class="lbl">平均 CPU</div><div class="val">'+pct(avgCpu)+'</div></div>'+
-    '<div class="stat"><div class="lbl">平均内存占用</div><div class="val">'+pct(avgMem)+'</div></div>'+
-    '<div class="stat"><div class="lbl">磁盘最满</div><div class="val '+(worstDisk>=90?'red':(worstDisk>=70?'yellow':''))+'">'+pct(worstDisk)+'<small> '+esc(worstName)+'</small></div></div>'+
-    '<div class="stat"><div class="lbl">数据时间</div><div class="val" style="font-size:17px;padding-top:6px">'+new Date(now*1000).toLocaleString('zh-CN',{hour12:false})+'</div></div>';
-  var fleetSeries=shown.map(function(m,i){
-    var h=hist[(m.info&&m.info.id)||'']||{cpu:[]};
-    return {label:(m.info&&m.info.name)||'', color:PALETTE[i%PALETTE.length], points:h.cpu, value:(m.report&&m.report.cpu)||0};
-  });
-  document.getElementById('fleetpanel').innerHTML=
-    '<div class="phead"><div><div class="ptitle">舰队 CPU 使用率</div><div class="psub">每台机器一条线 · 最近 '+(Math.max.apply(null, fleetSeries.map(function(s){return s.points.length}))||0)+' 次刷新</div></div></div>'+
-    legendHTML(fleetSeries)+timeChart(fleetSeries, 170);
-  var diskRows=shown.map(function(m){
-    var worst=null, worstP=-1;
-    (m.report&&m.report.disks||[]).forEach(function(d){var p=d.total>0?100*(d.total-d.free)/d.total:0;if(p>worstP){worstP=p;worst=d;}});
-    if(!worst)return '';
-    return '<div class="rowlbl"><span>'+esc(m.info.name)+' · '+esc(worst.mount)+'</span><b>已用 '+pct(worstP)+'（可用 '+gb(worst.free)+' / '+gb(worst.total)+'）</b></div><div class="bar"><i class="'+barCls(worstP)+'" style="width:'+worstP+'%"></i></div>';
-  }).join('');
-  document.getElementById('diskpanel').innerHTML='<div class="phead"><div class="ptitle">磁盘使用（每台最满的一块）</div></div>'+(diskRows||'<div class="empty">暂无磁盘数据。</div>');
-  document.getElementById('machgrid').innerHTML=shown.map(function(m){return machPanel(m, now)}).join('');
+  document.getElementById('grid').innerHTML=shown.map(function(m){return cardHTML(m, now)}).join('');
   document.getElementById('noresult').style.display=shown.length?'none':'block';
 }
-function machPanel(m, now){
+
+function cardHTML(m, now){
   var info=m.info||{}, rep=m.report, last=m.last_seen||0;
-  var has=!!rep, online=has&&m.online;
-  var statusCls=!has?'st-none':(online?'st-on':'st-off');
-  var statusTxt=!has?'待接入':(online?'● 在线':'● 离线');
-  var h='<div class="panel'+(has&&!online?' off':'')+(m.alert?' alert':'')+'">';
-  h+='<div class="phead"><div><div class="ptitle">'+esc(info.name||info.id)+'</div><div class="psub">'+esc(info.id)+' · '+esc(info.role||'')+'</div></div><div class="status '+statusCls+'">'+statusTxt+'</div></div>';
+  var has = !!rep;
+  var online = has && m.online;
+  var statusCls = !has ? 'st-none' : (online ? 'st-on' : 'st-off');
+  var statusTxt = !has ? '待接入' : (online ? '● 在线' : '● 离线');
+  var gray = !online;
+  var h='';
+  h+='<div class="card'+(has&&!online?' off':'')+(m.alert?' alert':'')+'">';
+  h+='<div class="chead"><div><div class="cname">'+esc(info.name||info.id)+'</div><div class="cid">'+esc(info.id)+' · '+esc(info.role||'')+'</div></div><div class="status '+statusCls+'">'+statusTxt+'</div></div>';
   if(!has){
     h+='<div class="empty">这台还没有接入监控。</div>';
   } else if(!rep.agent){
@@ -196,17 +147,25 @@ function machPanel(m, now){
     h+='</div></div>';
     h+='<div class="foot">远程探测（未装探针） · 更新于 '+ago(now-last)+'</div>';
   } else {
+    var cpu=rep.cpu||0;
     var mp=rep.mem_total>0?100*rep.mem_used/rep.mem_total:0;
-    var hh=hist[info.id]||{cpu:[],mem:[]};
-    h+='<div class="pstats"><span>CPU <b>'+pct(rep.cpu||0)+'</b></span><span>内存 <b>'+pct(mp)+'</b></span><span>更新于 '+ago(now-last)+'</span></div>';
-    h+=legendHTML([{label:'CPU',color:'#2fbf71',value:rep.cpu||0},{label:'内存',color:'#4da3ff',value:mp}]);
-    h+=timeChart([{label:'CPU',color:'#2fbf71',points:hh.cpu,value:rep.cpu||0},{label:'内存',color:'#4da3ff',points:hh.mem,value:mp}], 130);
+    var worst=null, worstP=-1;
+    (rep.disks||[]).forEach(function(d){var p=d.total>0?100*(d.total-d.free)/d.total:0;if(p>worstP){worstP=p;worst=d;}});
+    pushHist(info.id||info.name, cpu);
+    h+='<div class="gauges">';
+    h+='<div class="gauge">'+ringSVG(cpu, gray, '#4da3ff')+'<div class="glabel">CPU</div></div>';
+    h+='<div class="gauge">'+ringSVG(mp, gray, '#b678f0')+'<div class="glabel">内存</div><div class="gsub">'+gb(rep.mem_used)+' / '+gb(rep.mem_total)+'</div></div>';
+    if(worst){
+      h+='<div class="gauge">'+ringSVG(worstP, gray, '#e8a13a')+'<div class="glabel">磁盘最满</div><div class="gsub">'+esc(worst.mount)+' · 可用 '+gb(worst.free)+'</div></div>';
+    }
+    h+='</div>';
+    h+='<div class="sparkwrap"><div class="cap">CPU 走势（最近刷新）</div>'+sparkSVG(hist[info.id||info.name], gray?'#8fa3b8':(cpu>=90?'#e5534b':'#4da3ff'))+'</div>';
     if((rep.disks||[]).length){
       h+='<div class="sec"><h3>磁盘可用空间</h3>';
       rep.disks.forEach(function(d){
         var usedp=d.total>0?100*(d.total-d.free)/d.total:0;
         h+='<div class="rowlbl"><span>'+esc(d.mount)+'</span><b>可用 '+gb(d.free)+' / '+gb(d.total)+'（已用 '+pct(usedp)+'）</b></div>';
-        h+='<div class="bar"><i class="'+barCls(usedp)+'" style="width:'+usedp+'%"></i></div>';
+        h+='<div class="bar thin"><i class="'+barCls(usedp)+'" style="width:'+usedp+'%"></i></div>';
       });
       h+='</div>';
     }
@@ -227,13 +186,33 @@ function machPanel(m, now){
   h+='</div>';
   return h;
 }
+
 function refresh(){
   fetch('api/state').then(function(r){if(r.status===401){location.href='login';throw new Error('unauth')}return r.json()}).then(function(data){
     lastData=data;
-    (data.machines||[]).forEach(function(m){
-      if(m.report&&m.report.agent)pushHist(m.info.id, m.report.cpu||0, m.report.mem_total>0?100*m.report.mem_used/m.report.mem_total:0);
+    var now=data.now, ms=data.machines||[];
+    var on=0, total=ms.length, cpuSum=0, cpuN=0, alerts=0, worstDisk=0, worstName='';
+    ms.forEach(function(m){
+      if(m.report&&m.online)on++;
+      if(m.alert)alerts++;
+      if(m.report&&m.report.agent){cpuSum+=m.report.cpu||0;cpuN++;}
+      (m.report&&m.report.disks||[]).forEach(function(d){var p=d.total>0?100*(d.total-d.free)/d.total:0;if(p>worstDisk){worstDisk=p;worstName=m.info.name;}});
     });
-    document.getElementById('sub').textContent='数据时间：'+new Date(data.now*1000).toLocaleString('zh-CN',{hour12:false});
+    var avg=cpuN?cpuSum/cpuN:0;
+    var ab=document.getElementById('alertbar');
+    var alertMs=ms.filter(function(m){return m.alert});
+    if(alertMs.length){
+      ab.style.display='block';
+      ab.innerHTML='⚠️ <b>告警</b>：'+alertMs.map(function(m){return esc(m.info.name)+' 已离线 '+ago(now-(m.last_seen||now))}).join('；');
+    } else { ab.style.display='none'; }
+    var sum='<span class="pill">在线 <b>'+on+'</b> / '+total+' 台</span>';
+    if(alerts)sum+='<span class="pill alert">告警 <b>'+alerts+'</b> 台</span>';
+    sum+='<span class="pill">平均 CPU <b>'+pct(avg)+'</b></span>';
+    if(worstName)sum+='<span class="pill">磁盘最满 <b>'+worstName+' '+pct(worstDisk)+'</b></span>';
+    sum+='<span class="pill">每 30 秒自动刷新</span>';
+    sum+='<button class="refreshbtn" onclick="refresh()">立即刷新</button>';
+    document.getElementById('summary').innerHTML=sum;
+    document.getElementById('sub').textContent='数据时间：'+new Date(now*1000).toLocaleString('zh-CN',{hour12:false});
     render();
   }).catch(function(e){
     document.getElementById('sub').textContent='刷新失败，稍后自动重试';

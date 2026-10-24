@@ -7,21 +7,22 @@ with a mobile-first web dashboard.
 Each dashboard card shows, at a glance:
 
 - Online / offline status (with "last seen" age)
-- CPU usage (big number + bar, yellow ≥70%, red ≥90%)
+- CPU, memory, and fullest disk as ring gauges (blue / purple / orange;
+  red at 90% or above, gray when offline), plus a CPU trend line
 - Memory usage
 - Free disk space per mount
 - Top 5 processes by CPU — the machine's "main tasks"
 - Watched software status (process / TCP port / HTTP / systemd unit checks)
 
-### Dashboard (v1.1.0)
+### Dashboard (v1.2.0)
 
 - Search by machine name, ID, or role; filter by all / online / offline /
   alert, with alert machines sorted first.
-- Summary row: machines online, machines in alert, average CPU, average
-  memory, fullest disk, and data time.
-- Trend charts: a fleet CPU chart plus per-machine CPU and memory charts
-  (accumulated while the page is open, up to 48 refreshes).
-- A disk panel showing each machine's fullest mount.
+- Summary row: machines online, machines in alert, average CPU, fullest
+  disk, and data time.
+- Gauge panels: per-machine CPU, memory, and fullest-disk ring gauges,
+  plus a CPU trend line (accumulated while the page is open).
+- Disk, top-process, and watched-service sections per machine.
 - One-click refresh; the page still auto-refreshes every 30 seconds.
 
 Machines without an agent can still be watched with an external HTTP probe.
