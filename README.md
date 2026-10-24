@@ -13,6 +13,17 @@ Each dashboard card shows, at a glance:
 - Top 5 processes by CPU — the machine's "main tasks"
 - Watched software status (process / TCP port / HTTP / systemd unit checks)
 
+### Dashboard (v1.1.0)
+
+- Search by machine name, ID, or role; filter by all / online / offline /
+  alert, with alert machines sorted first.
+- Summary row: machines online, machines in alert, average CPU, average
+  memory, fullest disk, and data time.
+- Trend charts: a fleet CPU chart plus per-machine CPU and memory charts
+  (accumulated while the page is open, up to 48 refreshes).
+- A disk panel showing each machine's fullest mount.
+- One-click refresh; the page still auto-refreshes every 30 seconds.
+
 Machines without an agent can still be watched with an external HTTP probe.
 Machines offline for more than 5 minutes raise an alert (dashboard banner; the
 state API exposes `alert` flags so any notifier — email, chat bot, etc. — can
@@ -98,11 +109,16 @@ FleetMon 是一个极简的自有机队监控：一份 Go 代码、零第三方�
 管理台）。
 
 每台电脑一张卡，直观看到：在线状态、CPU 占用、内存、各盘可用空间、
-占用最高的 5 个程序（主要工作任务）、关键软件在线情况。没装探针的
+占用最高的 5 个程序（主要工作任务）、关键软件在线情况。v1.1.0 的管理台
+新增搜索与筛选、顶部统计、CPU 和内存趋势图、磁盘最满面板。没装探针的
 机器可用外部 HTTP 探测兜底。离线超 5 分钟触发告警标记；历史数据按天
 存 JSONL，14 天自动清理。
 
 构建与运行见上方英文部分；示例配置在 `examples/` 目录。
+
+## Author
+
+figo6260 — https://github.com/figo6260
 
 ## License
 
