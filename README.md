@@ -14,10 +14,15 @@ Each dashboard card shows, at a glance:
 - Top 5 processes by CPU — the machine's "main tasks"
 - Watched software status (process / TCP port / HTTP / systemd unit checks)
 
-### Dashboard (v1.2.0)
+### Dashboard (v1.3.0)
 
 - Search by machine name, ID, or role; filter by all / online / offline /
   alert, with alert machines sorted first.
+- Sort by CPU (high to low), memory (high to low), or fullest disk
+  (high to low); machines with no data or offline sort last.
+- Drag any machine card to reorder it manually; dragging switches back
+  to manual sort, and the order is saved in the browser (localStorage)
+  so it survives refresh. The sort choice is saved the same way.
 - Summary row: machines online, machines in alert, average CPU, fullest
   disk, and data time.
 - Gauge panels: per-machine CPU, memory, and fullest-disk ring gauges,

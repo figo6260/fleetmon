@@ -17,6 +17,10 @@
   .pill.alert{border-color:var(--bad);color:#ffb4ae}
   .refreshbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:5px 14px;font-size:13px;cursor:pointer}
   .toolbar{max-width:1180px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .card{cursor:grab}
+  .card.dragging{opacity:.45}
+  .card:active{cursor:grabbing}
+  #sort{background:#0f1722;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
   .toolbar input{flex:1 1 220px;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;font-size:14px;outline:none}
   .toolbar input:focus{border-color:var(--dim)}
   .fbtn{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:6px 13px;font-size:13px;cursor:pointer}
@@ -77,6 +81,8 @@
   <button class="fbtn" data-f="on">在线</button>
   <button class="fbtn" data-f="off">离线</button>
   <button class="fbtn" data-f="alert">有告警</button>
+  <label style="margin-left:auto;font-size:13px;color:var(--dim)">排序 <select id="sort"><option value="manual">手动排序</option><option value="cpu">CPU 从高到低</option><option value="mem">内存从高到低</option><option value="disk">磁盘最满从高到低</option></select></label>
+  <span style="font-size:12px;color:var(--dim)">拖动卡片可手动排序</span>
 </div>
 <div class="grid" id="grid"></div>
 <div class="noresult" id="noresult" style="display:none">没有匹配的机器，换个关键词或筛选条件试试。</div>
@@ -102,8 +108,21 @@ function sparkSVG(a, color){
 }
 
 var curFilter='all', curQuery='';
+var sortMode='manual', savedOrder=[], draggedEl=null;
+try{sortMode=localStorage.getItem('fleetmon-sort')||'manual';}catch(e){}
+try{savedOrder=JSON.parse(localStorage.getItem('fleetmon-order')||'[]');}catch(e){savedOrder=[];}
 document.querySelectorAll('.fbtn').forEach(function(b){b.addEventListener('click',function(){curFilter=b.getAttribute('data-f');document.querySelectorAll('.fbtn').forEach(function(x){x.classList.toggle('on',x===b)});render();});});
 document.getElementById('q').addEventListener('input',function(e){curQuery=e.target.value.trim().toLowerCase();render();});
+var sortSel=document.getElementById('sort');
+if(sortSel){sortSel.value=sortMode;sortSel.addEventListener('change',function(){sortMode=sortSel.value;try{localStorage.setItem('fleetmon-sort',sortMode);}catch(e){}render();});}
+document.getElementById('grid').addEventListener('dragover',function(e){
+  var grid=document.getElementById('grid');
+  var t=e.target.closest?e.target.closest('.card'):null;
+  if(!t||!draggedEl||t===draggedEl)return;
+  e.preventDefault();
+  var r=t.getBoundingClientRect();
+  if((e.clientX-r.left)>r.width/2){grid.insertBefore(draggedEl,t.nextSibling);}else{grid.insertBefore(draggedEl,t);}
+});
 var lastData=null;
 function render(){
   if(!lastData)return;
@@ -120,12 +139,48 @@ function render(){
     }
     return true;
   });
-  shown.sort(function(a,b){
-    var sa=(a.alert||(a.report&&!a.online))?0:1, sb=(b.alert||(b.report&&!b.online))?0:1;
-    if(sa!==sb)return sa-sb;
-    return String((a.info&&a.info.name)||'').localeCompare(String((b.info&&b.info.name)||''));
+  function metric(m,k){
+    var r=m.report; if(!r||!m.online)return -1;
+    if(k==='cpu')return r.cpu||0;
+    if(k==='mem')return r.mem_total>0?100*r.mem_used/r.mem_total:0;
+    if(k==='disk'){var w=-1;(r.disks||[]).forEach(function(d){var p=d.total>0?100*(d.total-d.free)/d.total:0;if(p>w)w=p;});return w;}
+    return 0;
+  }
+  function byName(a,b){return String((a.info&&a.info.name)||'').localeCompare(String((b.info&&b.info.name)||''));}
+  if(sortMode==='manual'&&savedOrder.length){
+    var idx={}; savedOrder.forEach(function(id,i){idx[id]=i;});
+    shown.sort(function(a,b){
+      var ia=idx[(a.info&&a.info.id)||''], ib=idx[(b.info&&b.info.id)||''];
+      if(ia===undefined)ia=9999; if(ib===undefined)ib=9999;
+      if(ia!==ib)return ia-ib;
+      return byName(a,b);
+    });
+  } else if(sortMode!=='manual'){
+    shown.sort(function(a,b){var d=metric(b,sortMode)-metric(a,sortMode); if(d!==0)return d; return byName(a,b);});
+  } else {
+    shown.sort(function(a,b){
+      var sa=(a.alert||(a.report&&!a.online))?0:1, sb=(b.alert||(b.report&&!b.online))?0:1;
+      if(sa!==sb)return sa-sb;
+      return byName(a,b);
+    });
+  }
+  var grid=document.getElementById('grid');
+  grid.innerHTML=shown.map(function(m){return cardHTML(m, now)}).join('');
+  grid.querySelectorAll('.card').forEach(function(c){
+    c.addEventListener('dragstart',function(e){
+      draggedEl=c;
+      c.classList.add('dragging');
+      try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',c.getAttribute('data-id'));}catch(err){}
+      if(sortMode!=='manual'){sortMode='manual';if(sortSel)sortSel.value='manual';try{localStorage.setItem('fleetmon-sort','manual');}catch(err){}}
+    });
+    c.addEventListener('dragend',function(){
+      c.classList.remove('dragging');
+      draggedEl=null;
+      savedOrder=[].map.call(grid.children,function(ch){return ch.getAttribute('data-id');});
+      try{localStorage.setItem('fleetmon-order',JSON.stringify(savedOrder));}catch(err){}
+      render();
+    });
   });
-  document.getElementById('grid').innerHTML=shown.map(function(m){return cardHTML(m, now)}).join('');
   document.getElementById('noresult').style.display=shown.length?'none':'block';
 }
 
@@ -137,7 +192,7 @@ function cardHTML(m, now){
   var statusTxt = !has ? '待接入' : (online ? '● 在线' : '● 离线');
   var gray = !online;
   var h='';
-  h+='<div class="card'+(has&&!online?' off':'')+(m.alert?' alert':'')+'">';
+  h+='<div class="card'+(has&&!online?' off':'')+(m.alert?' alert':'')+'" data-id="'+esc(info.id||'')+'" draggable="true">';
   h+='<div class="chead"><div><div class="cname">'+esc(info.name||info.id)+'</div><div class="cid">'+esc(info.id)+' · '+esc(info.role||'')+'</div></div><div class="status '+statusCls+'">'+statusTxt+'</div></div>';
   if(!has){
     h+='<div class="empty">这台还没有接入监控。</div>';

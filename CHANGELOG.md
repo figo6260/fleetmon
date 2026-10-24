@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.0 — 2026-10-24
+
+### Added
+
+- Dashboard sort: CPU high to low, memory high to low, fullest disk
+  high to low (machines with no data or offline sort last).
+- Dashboard drag-to-reorder: drag any machine card to move it;
+  dragging switches to manual sort, and both the manual order and the
+  sort choice are saved in the browser (localStorage).
+
 ## v1.2.0 — 2026-10-24
 
 ### Changed
