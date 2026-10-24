@@ -4,40 +4,50 @@ A tiny, dependency-free fleet monitor for your own machines: one Go binary that
 works as a lightweight **agent** on each computer and as a **central server**
 with a mobile-first web dashboard.
 
-Each dashboard card shows, at a glance:
+## Features
 
-- Online / offline status (with "last seen" age)
-- CPU, memory, and fullest disk as ring gauges (blue / purple / orange;
-  red at 90% or above, gray when offline), plus a CPU trend line
-- Memory usage
-- Free disk space per mount
+**Monitoring (agent, every 60 seconds by default)**
+
+- CPU, memory, and disk usage per mount
 - Top 5 processes by CPU — the machine's "main tasks"
-- Watched software status (process / TCP port / HTTP / systemd unit checks)
+- Watched service checks: process name, TCP port, HTTP status, systemd
+  unit / Windows service
+- One config file per machine; Linux and Windows agents share one codebase
 
-### Dashboard (v1.3.0)
+**Dashboard (mobile-first, Basic Auth)**
 
+- One card per machine: online/offline status with "last seen" age, CPU /
+  memory / fullest-disk ring gauges (blue / purple / orange; red at 90%
+  or above, gray when offline), and a CPU trend line
+- Per-machine disk, top-process, and watched-service sections
 - Search by machine name, ID, or role; filter by all / online / offline /
-  alert, with alert machines sorted first.
-- Sort by CPU (high to low), memory (high to low), or fullest disk
-  (high to low); machines with no data or offline sort last.
+  alert, with alert machines sorted first
+- Sort by CPU, memory, or fullest disk (high to low); machines with no
+  data or offline sort last
 - Drag any machine card to reorder it manually; dragging switches back
-  to manual sort, and the order is saved in the browser (localStorage)
-  so it survives refresh. The sort choice is saved the same way.
+  to manual sort, and the order and the sort choice are saved in the
+  browser (localStorage) so they survive refresh
 - Summary row: machines online, machines in alert, average CPU, fullest
-  disk, and data time.
-- Gauge panels: per-machine CPU, memory, and fullest-disk ring gauges,
-  plus a CPU trend line (accumulated while the page is open).
-- Disk, top-process, and watched-service sections per machine.
-- One-click refresh; the page still auto-refreshes every 30 seconds.
+  disk, and data time
+- One-click refresh; the page still auto-refreshes every 30 seconds
 
-Machines without an agent can still be watched with an external HTTP probe.
-Machines offline for more than 5 minutes raise an alert (dashboard banner; the
-state API exposes `alert` flags so any notifier — email, chat bot, etc. — can
-pick them up). History is kept as daily JSONL files and auto-pruned after
-14 days.
+**Alerts, history, and API**
 
-**No third-party dependencies** — Go standard library only. One static binary
-(~9 MB), ~15 MB RAM for the agent. Linux and Windows agents share one codebase.
+- Machines offline for more than 5 minutes raise an alert: a dashboard
+  banner plus an `alert` flag in the state API, so an external notifier
+  (email, chat bot, script) can pick it up
+- Machines without an agent can still be watched with an external HTTP
+  probe
+- History kept as daily JSONL files, auto-pruned after 14 days
+- `GET /api/state` returns the same JSON the dashboard renders
+
+**Deployment**
+
+- No third-party dependencies — Go standard library only; one static
+  binary (~9 MB), ~15 MB RAM for the agent
+- Agents only push to the server (Bearer token), so they work behind NAT;
+  run over a LAN or a mesh VPN (Tailscale / Headscale / WireGuard)
+- systemd units for agent and server in `examples/`
 
 中文说明见下方。
 
@@ -114,10 +124,12 @@ FleetMon 是一个极简的自有机队监控：一份 Go 代码、零第三方�
 二进制既当探针（装在每台电脑上）又当中央服务（带一个手机优先的网页
 管理台）。
 
-每台电脑一张卡，直观看到：在线状态、CPU 占用、内存、各盘可用空间、
-占用最高的 5 个程序（主要工作任务）、关键软件在线情况。v1.1.0 的管理台
-新增搜索与筛选、顶部统计、CPU 和内存趋势图、磁盘最满面板。没装探针的
-机器可用外部 HTTP 探测兜底。离线超 5 分钟触发告警标记；历史数据按天
+每台电脑一张卡，直观看到：在线状态、CPU、内存、各盘可用空间、占用
+最高的 5 个程序（主要工作任务）、关键软件在线情况。管理台（v1.3.0）
+有仪表盘、搜索与筛选、CPU／内存／磁盘最满三种排序、卡片拖动手动排序
+（顺序和排序选择都存在浏览器里，刷新还在）、顶部统计、CPU 走势。没装
+探针的机器可用外部 HTTP 探测兜底。离线超 5 分钟触发告警标记（管理台
+横幅＋状态接口的 alert 标记，可接外部邮件／机器人通知）；历史数据按天
 存 JSONL，14 天自动清理。
 
 构建与运行见上方英文部分；示例配置在 `examples/` 目录。
