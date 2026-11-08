@@ -129,10 +129,78 @@ func collect(cfg AgentConfig) Report {
 			}
 		}
 	}
-	if len(tops) > 5 {
-		tops = tops[:5]
+	if len(tops) > 12 {
+		tops = tops[:12]
 	}
 	rep.Top = tops
+
+	// Recently started processes = "tasks" the user wants to watch
+	// (installers, builds, code runs, ...). One extra CIM query per interval.
+	now := time.Now()
+	cpuByPid := map[int]float64{}
+	memByPid := map[int]float64{}
+	for pid, p1 := range s1 {
+		if p0, ok := s0[pid]; ok {
+			cpuByPid[pid] = 100 * float64(p1.cpu-p0.cpu) / float64(elapsed) / numCPU
+			if rep.MemTotal > 0 {
+				memByPid[pid] = 100 * float64(p1.mem) / float64(rep.MemTotal)
+			}
+		}
+	}
+	var recent []ProcDetail
+	out2 := ps("Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId)|$($_.Name)|$($_.CreationDate)|$($_.CommandLine)\" }")
+	for _, line := range strings.Split(out2, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		f := strings.SplitN(line, "|", 4)
+		if len(f) != 4 {
+			continue
+		}
+		pid, _ := strconv.Atoi(f[0])
+		cmd := f[3]
+		if strings.Contains(cmd, "Get-CimInstance Win32_Process") {
+			continue // our own collector query
+		}
+		var age uint64
+		if len(f[2]) >= 14 {
+			if t, err := time.ParseInLocation("20060102150405", f[2][:14], time.Local); err == nil {
+				d := now.Sub(t)
+				if d >= 0 {
+					age = uint64(d.Seconds())
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
+		} else {
+			continue
+		}
+		if age <= 900 {
+			r := []rune(strings.TrimSpace(cmd))
+			cmdShort := string(r)
+			if len(r) > 160 {
+				cmdShort = string(r[:160]) + "…"
+			}
+			recent = append(recent, ProcDetail{
+				Name: f[1], PID: pid, CPU: cpuByPid[pid], Mem: memByPid[pid],
+				Cmd: cmdShort, Age: age,
+			})
+		}
+	}
+	for i := 0; i < len(recent); i++ {
+		for j := i + 1; j < len(recent); j++ {
+			if recent[j].Age < recent[i].Age {
+				recent[i], recent[j] = recent[j], recent[i]
+			}
+		}
+	}
+	if len(recent) > 12 {
+		recent = recent[:12]
+	}
+	rep.Recent = recent
 
 	// disks: fixed local drives
 	out := ps("Get-CimInstance Win32_LogicalDisk -Filter \"DriveType=3\" | ForEach-Object { \"$($_.DeviceID)|$($_.Size)|$($_.FreeSpace)\" }")

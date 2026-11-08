@@ -43,10 +43,21 @@ func readCPUTimes() cpuTimes {
 }
 
 type procSample struct {
-	pid  int
-	name string
-	tick uint64
-	rss  uint64
+	pid       int
+	name      string
+	tick      uint64
+	rss       uint64
+	startTick uint64 // field 22 of /proc/pid/stat: start time in clock ticks since boot
+	cmd       string // short command line ("" for kernel threads)
+}
+
+func truncateCmd(s string, n int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
 }
 
 func readProcs() []procSample {
@@ -65,17 +76,38 @@ func readProcs() []procSample {
 		}
 		name := s[open+1 : closeIdx]
 		f := strings.Fields(s[closeIdx+2:])
-		// f[0]=state; utime is field 14 overall -> index 11 here; stime field 15 -> 12; rss field 24 -> 21 (in pages)
+		// f[0]=state; utime is field 14 overall -> index 11 here; stime field 15 -> 12; rss field 24 -> 21 (in pages); starttime field 22 -> 19
 		if len(f) < 22 {
 			continue
 		}
 		utime, _ := strconv.ParseUint(f[11], 10, 64)
 		stime, _ := strconv.ParseUint(f[12], 10, 64)
 		rssPages, _ := strconv.ParseUint(f[21], 10, 64)
+		startTick, _ := strconv.ParseUint(f[19], 10, 64)
 		pid, _ := strconv.Atoi(filepath.Base(e))
-		out = append(out, procSample{pid: pid, name: name, tick: utime + stime, rss: rssPages * 4096})
+		cmd := ""
+		if b, err := os.ReadFile(filepath.Join(e, "cmdline")); err == nil && len(b) > 0 {
+			cmd = truncateCmd(strings.ReplaceAll(string(b), "\x00", " "), 160)
+		}
+		out = append(out, procSample{pid: pid, name: name, tick: utime + stime, rss: rssPages * 4096, startTick: startTick, cmd: cmd})
 	}
 	return out
+}
+
+func readUptimeSec() uint64 {
+	b, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0
+	}
+	f := strings.Fields(string(b))
+	if len(f) == 0 {
+		return 0
+	}
+	v, _ := strconv.ParseFloat(f[0], 64)
+	if v < 0 {
+		return 0
+	}
+	return uint64(v)
 }
 
 func readMem() (used, total uint64) {
@@ -177,7 +209,10 @@ func collect(cfg AgentConfig) Report {
 	for _, p := range p0 {
 		before[p.pid] = p
 	}
+	uptime := readUptimeSec()
+	const clockTicks = 100 // USER_HZ on all our kernels
 	var tops []Proc
+	var recent []ProcDetail
 	for _, p := range p1 {
 		if b, ok := before[p.pid]; ok && totalDelta > 0 {
 			cpu := 100 * float64(p.tick-b.tick) / float64(totalDelta)
@@ -188,13 +223,32 @@ func collect(cfg AgentConfig) Report {
 			if cpu >= 0.1 || mem >= 1 {
 				tops = append(tops, Proc{Name: p.name, CPU: cpu, Mem: mem})
 			}
+			// recently started = a "task" the user wants to watch
+			// (installers, builds, code runs, ...)
+			if uptime > 0 && p.startTick > 0 {
+				startSec := p.startTick / clockTicks
+				if startSec <= uptime {
+					age := uptime - startSec
+					if age <= 900 {
+					recent = append(recent, ProcDetail{
+						Name: p.name, PID: p.pid, CPU: cpu, Mem: mem,
+						Cmd: p.cmd, Age: age,
+					})
+				}
+			}
 		}
 	}
+	}
 	sort.Slice(tops, func(i, j int) bool { return tops[i].CPU > tops[j].CPU })
-	if len(tops) > 5 {
-		tops = tops[:5]
+	if len(tops) > 12 {
+		tops = tops[:12]
 	}
 	rep.Top = tops
+	sort.Slice(recent, func(i, j int) bool { return recent[i].Age < recent[j].Age })
+	if len(recent) > 12 {
+		recent = recent[:12]
+	}
+	rep.Recent = recent
 
 	seen := map[string]bool{}
 	addDisk := func(m string) {

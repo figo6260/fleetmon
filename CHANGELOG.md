@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.4.0 — 2026-10-29
+
+### Added
+
+- Agent now reports recently started processes ("最近启动的任务"):
+  anything started within the last 15 minutes, with command line and
+  age — installers, builds, and code runs are visible even when they are
+  not CPU-heavy (Linux + Windows).
+- Top-process list expanded from 5 to 12 entries.
+
+### Changed
+
+- Dashboard: "主要工作任务" shows the top 12 by CPU; a new
+  "最近启动的任务" section lists recently started processes with their
+  command line and start age.
+
 ## v1.3.0 — 2026-10-24
 
 ### Added

@@ -92,6 +92,7 @@ function pct(n){return n.toFixed(0)+'%'}
 function barCls(v){return v>=90?'hi':(v>=70?'mid':'')}
 function ringColor(v, gray){if(gray)return '#8fa3b8';return v>=90?'#e5534b':(v>=70?'#e8a13a':'#2fbf71')}
 function ago(sec){if(sec<0)sec=0;if(sec<60)return sec+' 秒前';if(sec<3600)return Math.floor(sec/60)+' 分钟前';if(sec<86400)return Math.floor(sec/3600)+' 小时前';return Math.floor(sec/86400)+' 天前'}
+function ageStr(sec){sec=Math.max(0,Math.round(sec||0));if(sec<60)return sec+' 秒';if(sec<3600)return Math.floor(sec/60)+' 分钟';if(sec<86400)return Math.floor(sec/3600)+' 小时';return Math.floor(sec/86400)+' 天'}
 function uptimeStr(s){if(!s)return '—';var d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d>0?('已运行 '+d+' 天 '+h+' 小时'):('已运行 '+h+' 小时')}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 
@@ -225,9 +226,18 @@ function cardHTML(m, now){
       h+='</div>';
     }
     if((rep.top||[]).length){
-      h+='<div class="sec"><h3>主要工作任务（按 CPU）</h3>';
-      rep.top.slice(0,5).forEach(function(t){
+      h+='<div class="sec"><h3>主要工作任务（按 CPU · 前 12）</h3>';
+      rep.top.slice(0,12).forEach(function(t){
         h+='<div class="task"><span class="tn">'+esc(t.name)+'</span><span class="tv">CPU '+pct(t.cpu)+(t.mem>=1?' · 内存 '+pct(t.mem):'')+'</span></div>';
+      });
+      h+='</div>';
+    }
+    if((rep.recent||[]).length){
+      h+='<div class="sec"><h3>最近启动的任务（15 分钟内）</h3>';
+      rep.recent.slice(0,12).forEach(function(t){
+        var cmd=(t.cmd||'').trim();
+        var cmdHtml=cmd?(' <span style="color:var(--dim)">· '+esc(cmd.length>70?cmd.slice(0,70)+'…':cmd)+'</span>'):'';
+        h+='<div class="task"><span class="tn" title="'+esc(cmd)+'">'+esc(t.name)+cmdHtml+'</span><span class="tv">'+ageStr(t.age)+'前 · CPU '+pct(t.cpu)+'</span></div>';
       });
       h+='</div>';
     }

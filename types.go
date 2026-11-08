@@ -14,6 +14,17 @@ type Proc struct {
 	Mem  float64 `json:"mem"` // percent of total memory
 }
 
+// ProcDetail is one recently-started process: a "task" the user can watch
+// in the dashboard (installers, builds, code runs, ...).
+type ProcDetail struct {
+	Name string  `json:"name"`
+	PID  int     `json:"pid,omitempty"`
+	CPU  float64 `json:"cpu"`
+	Mem  float64 `json:"mem"`
+	Cmd  string  `json:"cmd,omitempty"` // short command line / image path
+	Age  uint64  `json:"age"`           // seconds since process start
+}
+
 // Service is one watched item's online state.
 type Service struct {
 	Name   string `json:"name"`
@@ -23,20 +34,21 @@ type Service struct {
 
 // Report is what an agent sends to the server every interval.
 type Report struct {
-	Machine  string    `json:"machine"`
-	Name     string    `json:"name"`
-	Role     string    `json:"role"`
-	Hostname string    `json:"hostname"`
-	OS       string    `json:"os"`
-	Time     int64     `json:"time"` // unix seconds, agent clock
-	CPU      float64   `json:"cpu"`
-	MemUsed  uint64    `json:"mem_used"`
-	MemTotal uint64    `json:"mem_total"`
-	Disks    []Disk    `json:"disks"`
-	Top      []Proc    `json:"top"`
-	Services []Service `json:"services"`
-	Uptime   uint64    `json:"uptime"` // seconds
-	Agent    bool      `json:"agent"`  // false for external-probe pseudo reports
+	Machine  string       `json:"machine"`
+	Name     string       `json:"name"`
+	Role     string       `json:"role"`
+	Hostname string       `json:"hostname"`
+	OS       string       `json:"os"`
+	Time     int64        `json:"time"` // unix seconds, agent clock
+	CPU      float64      `json:"cpu"`
+	MemUsed  uint64       `json:"mem_used"`
+	MemTotal uint64       `json:"mem_total"`
+	Disks    []Disk       `json:"disks"`
+	Top      []Proc       `json:"top"`
+	Recent   []ProcDetail `json:"recent,omitempty"`
+	Services []Service    `json:"services"`
+	Uptime   uint64       `json:"uptime"` // seconds
+	Agent    bool         `json:"agent"`  // false for external-probe pseudo reports
 }
 
 // ServiceCheck configures one watched item on an agent.
