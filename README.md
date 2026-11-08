@@ -9,13 +9,16 @@ with a mobile-first web dashboard.
 **Monitoring (agent, every 60 seconds by default)**
 
 - CPU, memory, and disk usage per mount
-- Top 5 processes by CPU — the machine's "main tasks"
+- Top 12 processes by CPU — the machine's "main tasks"
 - Watched service checks: process name, TCP port, HTTP status, systemd
   unit / Windows service
 - One config file per machine; Linux and Windows agents share one codebase
 
 **Dashboard (mobile-first, Basic Auth)**
 
+- Fluid widescreen layout: the page uses the full browser width and
+  machine cards reflow from 1 column on phones to as many as fit on a
+  wide monitor, with no horizontal scrolling
 - One card per machine: online/offline status with "last seen" age, CPU /
   memory / fullest-disk ring gauges (blue / purple / orange; red at 90%
   or above, gray when offline), and a CPU trend line
@@ -133,7 +136,9 @@ FleetMon 是一个极简的自有机队监控：一份 Go 代码、零第三方�
 管理台）。
 
 每台电脑一张卡，直观看到：在线状态、CPU、内存、各盘可用空间、占用
-最高的 5 个程序（主要工作任务）、关键软件在线情况。管理台（v1.3.0）
+最高的 12 个程序（主要工作任务）、15 分钟内新启动的任务（含命令行）、
+关键软件在线情况。管理台（v1.5.0）宽屏自适应：页面占满浏览器宽度，卡片
+按屏宽自动排 1 列到多列，不再出现横向滚动条。
 有仪表盘、搜索与筛选、CPU／内存／磁盘最满三种排序、卡片拖动手动排序
 （顺序和排序选择都存在浏览器里，刷新还在）、顶部统计、CPU 走势。没装
 探针的机器可用外部 HTTP 探测兜底。离线超 5 分钟触发告警标记（管理台
