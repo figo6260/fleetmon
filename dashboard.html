@@ -7,8 +7,9 @@
 <style>
   :root{--bg:#0e1319;--card:#182130;--card2:#1f2b3f;--txt:#e8eef5;--dim:#8fa3b8;--ok:#2fbf71;--bad:#e5534b;--warn:#e8a13a;--line:#263449}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px 12px 30px}
-  header{max-width:1180px;margin:0 auto 12px}
+  html,body{overflow-x:clip}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px 16px 30px}
+  header{width:100%;max-width:2560px;margin:0 auto 12px}
   h1{font-size:21px;font-weight:700}
   .sub{color:var(--dim);font-size:13px;margin-top:4px}
   .summary{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
@@ -16,22 +17,22 @@
   .pill b{font-size:15px}
   .pill.alert{border-color:var(--bad);color:#ffb4ae}
   .refreshbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:5px 14px;font-size:13px;cursor:pointer}
-  .toolbar{max-width:1180px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .card{cursor:grab}
+  .toolbar{width:100%;max-width:2560px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .card{cursor:grab;min-width:0}
   .card.dragging{opacity:.45}
   .card:active{cursor:grabbing}
   #sort{background:#0f1722;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
-  .toolbar input{flex:1 1 220px;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;font-size:14px;outline:none}
+  .toolbar input{flex:1 1 220px;min-width:0;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 12px;font-size:14px;outline:none}
   .toolbar input:focus{border-color:var(--dim)}
   .fbtn{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:6px 13px;font-size:13px;cursor:pointer}
   .fbtn.on{background:var(--card2);color:var(--txt);border-color:var(--dim)}
-  .grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
-  @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
-  @media(min-width:1200px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .grid{width:100%;max-width:2560px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,370px),1fr));gap:12px;align-items:start}
+  .grid>*{min-width:0}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
   .card.off{opacity:.62}
   .card.alert{border-color:var(--bad)}
   .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .chead>div{min-width:0}
   .cname{font-size:20px;font-weight:700;line-height:1.25}
   .cid{color:var(--dim);font-size:12px;margin-top:2px}
   .status{font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;white-space:nowrap}
@@ -51,11 +52,12 @@
   .bar>i.mid{background:var(--warn)} .bar>i.hi{background:var(--bad)}
   .bar.thin{height:6px}
   .rowlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:10px;gap:8px}
-  .rowlbl b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rowlbl>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rowlbl b{color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums;white-space:normal;text-align:right;flex-shrink:0}
   .sec{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
   .sec h3{font-size:12px;color:var(--dim);font-weight:600;margin-bottom:7px;letter-spacing:.05em}
   .task{display:flex;justify-content:space-between;font-size:13px;padding:2.5px 0;gap:8px}
-  .task .tn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task .tn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .task .tv{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{font-size:12px;border-radius:999px;padding:3.5px 9px;background:var(--card2);border:1px solid var(--line)}
@@ -64,14 +66,14 @@
   .chip.up .dot{background:var(--ok)} .chip.down .dot{background:var(--bad)}
   .foot{color:var(--dim);font-size:11.5px;margin-top:12px;line-height:1.6}
   .empty{color:var(--dim);font-size:13px;padding:8px 0 2px}
-  .noresult{max-width:1180px;margin:0 auto;color:var(--dim);font-size:14px;padding:24px 4px}
+  .noresult{width:100%;max-width:2560px;margin:0 auto;color:var(--dim);font-size:14px;padding:24px 4px}
 </style>
 </head>
 <body>
 <header>
   <h1>🖥️ 电脑舰队管理台</h1>
   <div class="sub" id="sub">加载中…</div>
-  <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a></div>
+  <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a><span style="color:var(--dim);font-size:12.5px"> · FleetMon v1.5.0</span></div>
   <div class="summary" id="summary"></div>
   <div id="alertbar" style="display:none;margin-top:10px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.6"></div>
 </header>

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.5.0 — 2026-11-08
+
+### Changed
+
+- Dashboard is now a fluid widescreen layout: the page no longer caps
+  at 1180 px — machine cards reflow with `repeat(auto-fill,
+  minmax(370px, 1fr))`, so a wide monitor shows 4–7 columns instead of
+  3, and phones still get a single column.
+- Fixed the horizontal overflow that forced sideways scrolling on wide
+  screens: disk-usage values may now wrap instead of forcing their card
+  wider, grid items and toolbar/search inputs can shrink (`min-width:
+  0`), and `overflow-x: clip` on the page guarantees no horizontal
+  scrollbar remains.
+- The dashboard header shows the running version (v1.5.0) next to the
+  logout link, so the deployed version is visible at a glance.
+
 ## v1.4.0 — 2026-10-29
 
 ### Added
