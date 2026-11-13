@@ -155,7 +155,7 @@ func (s *store) pruneLoop() {
 	}
 }
 
-func runServer(cfg ServerConfig) {
+func runServer(cfg ServerConfig, cfgPath string) {
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		fmt.Fprintln(os.Stderr, "data dir:", err)
 		os.Exit(1)
@@ -202,10 +202,28 @@ func runServer(cfg ServerConfig) {
 	// Basic Auth stays as a fallback; Bearer token for automation.)
 	base := cfg.WebBasePath // e.g. "/fleet" when a proxy strips that prefix
 	cookiePath := base + "/"
-	sessionKey := []byte(cfg.WebPassSHA + ":" + cfg.Token)
+
+	// The web password can be changed at runtime (POST /api/password), so
+	// the current hash lives in a mutable cell rather than only in cfg;
+	// successful changes are also persisted back to cfgPath.
+	var passMu sync.RWMutex
+	curPassSHA := cfg.WebPassSHA
+	getPassSHA := func() string {
+		passMu.RLock()
+		defer passMu.RUnlock()
+		return curPassSHA
+	}
+	setPassSHA := func(sha string) {
+		passMu.Lock()
+		defer passMu.Unlock()
+		curPassSHA = sha
+	}
+	// sessionKey derives from the password hash, so a password change
+	// invalidates every outstanding session cookie automatically.
+	sessionKey := func() []byte { return []byte(getPassSHA() + ":" + cfg.Token) }
 	makeSession := func() string {
 		exp := strconv.FormatInt(time.Now().Add(30*24*time.Hour).Unix(), 10)
-		mac := hmac.New(sha256.New, sessionKey)
+		mac := hmac.New(sha256.New, sessionKey())
 		mac.Write([]byte("fleetmon-session:" + exp))
 		return exp + "." + hex.EncodeToString(mac.Sum(nil))
 	}
@@ -222,7 +240,7 @@ func runServer(cfg ServerConfig) {
 		if err != nil || time.Now().Unix() > exp {
 			return false
 		}
-		mac := hmac.New(sha256.New, sessionKey)
+		mac := hmac.New(sha256.New, sessionKey())
 		mac.Write([]byte("fleetmon-session:" + parts[0]))
 		want := hex.EncodeToString(mac.Sum(nil))
 		return subtle.ConstantTimeCompare([]byte(want), []byte(parts[1])) == 1
@@ -241,7 +259,7 @@ func runServer(cfg ServerConfig) {
 			}
 			user, pass, ok := r.BasicAuth()
 			sum := sha256.Sum256([]byte(pass))
-			passOK := hex.EncodeToString(sum[:]) == cfg.WebPassSHA
+			passOK := hex.EncodeToString(sum[:]) == getPassSHA()
 			if ok && user == cfg.WebUser && passOK &&
 				subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebUser)) == 1 {
 				h(w, r)
@@ -261,7 +279,7 @@ func runServer(cfg ServerConfig) {
 			user := r.FormValue("user")
 			pass := r.FormValue("pass")
 			sum := sha256.Sum256([]byte(pass))
-			passOK := hex.EncodeToString(sum[:]) == cfg.WebPassSHA
+			passOK := hex.EncodeToString(sum[:]) == getPassSHA()
 			if user == cfg.WebUser && passOK &&
 				subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebUser)) == 1 {
 				http.SetCookie(w, &http.Cookie{
@@ -299,6 +317,97 @@ func runServer(cfg ServerConfig) {
 		})
 		http.Redirect(w, r, base+"/login", http.StatusFound)
 	})
+
+	// persistPassSHA writes a new web_pass_sha256 back to the config file
+	// this process was started with. Only that one field changes: the file
+	// is decoded into raw JSON values so every other field (machines,
+	// token, ...) is preserved byte-for-byte, and the write is atomic
+	// (temp file + rename, 0600 like the original).
+	persistPassSHA := func(newSHA string) error {
+		b, err := os.ReadFile(cfgPath)
+		if err != nil {
+			return err
+		}
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(b, &raw); err != nil {
+			return err
+		}
+		v, err := json.Marshal(newSHA)
+		if err != nil {
+			return err
+		}
+		raw["web_pass_sha256"] = v
+		out, err := json.MarshalIndent(raw, "", "  ")
+		if err != nil {
+			return err
+		}
+		out = append(out, '\n')
+		tmp, err := os.CreateTemp(filepath.Dir(cfgPath), ".server.json.tmp-*")
+		if err != nil {
+			return err
+		}
+		tmpName := tmp.Name()
+		defer os.Remove(tmpName)
+		if err := tmp.Chmod(0o600); err != nil {
+			tmp.Close()
+			return err
+		}
+		if _, err := tmp.Write(out); err != nil {
+			tmp.Close()
+			return err
+		}
+		if err := tmp.Close(); err != nil {
+			return err
+		}
+		return os.Rename(tmpName, cfgPath)
+	}
+
+	mux.HandleFunc("/api/password", auth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			Current string `json:"current_password"`
+			New     string `json:"new_password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "请求格式不对", http.StatusBadRequest)
+			return
+		}
+		sum := sha256.Sum256([]byte(req.Current))
+		curOK := subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(getPassSHA())) == 1
+		if !curOK {
+			http.Error(w, "当前密码不对", http.StatusUnauthorized)
+			return
+		}
+		if n := len([]rune(req.New)); n < 8 || n > 64 {
+			http.Error(w, "新密码长度要在 8 到 64 位之间", http.StatusBadRequest)
+			return
+		}
+		nsum := sha256.Sum256([]byte(req.New))
+		newSHA := hex.EncodeToString(nsum[:])
+		if err := persistPassSHA(newSHA); err != nil {
+			fmt.Fprintln(os.Stderr, "persist password:", err)
+			http.Error(w, "保存新密码失败", http.StatusInternalServerError)
+			return
+		}
+		setPassSHA(newSHA)
+		// The session key derives from the password hash, so every old
+		// session (including this request's cookie) is already invalid;
+		// clear the cookie explicitly too, and let the UI re-login.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "fleetmon_session",
+			Value:    "",
+			Path:     cookiePath,
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
 
 	mux.HandleFunc("/", auth(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
