@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.6.0 — 2026-11-12
+
+### Added
+
+- Change the dashboard password from the dashboard itself: a
+  "修改密码" link next to logout opens a form (current password, new
+  password, confirmation) backed by an authenticated
+  `POST /api/password` endpoint. The endpoint verifies the current
+  password, enforces an 8–64 character new password, and persists the
+  new hash back to the server config atomically (temp file + rename,
+  0600, no other field touched). Because the session key derives from
+  the password hash, all existing sessions are invalidated by a
+  password change and the user is sent back to the login page.
+- Rename machines from the dashboard: every machine card gets a
+  "改名" link that opens a dialog (display name + optional
+  description), backed by an authenticated
+  `POST /api/machines/{id}/rename` endpoint. The rename is a
+  display-layer override only — stored as `display_name` / `desc` on
+  the machine's registry entry in the server config (same atomic
+  write-back), it takes effect in `/api/state` immediately, survives
+  restarts, and never touches the machine id (the agent's identity
+  key) or any agent's own config. Each rename is written to the
+  server log as an audit entry.
+
+### Notes
+
+- The two features above were developed as v1.5.1 and v1.5.2 (see
+  the entries below) and are released together as v1.6.0.
+
 ## v1.5.2 — 2026-11-12
 
 ### Added
