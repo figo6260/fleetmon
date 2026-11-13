@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.1 — 2026-11-12
+
+### Added
+
+- Change-password in the dashboard: a "修改密码" link next to logout
+  opens a form (current password, new password, confirmation) backed by
+  a new authenticated `POST /api/password` endpoint. The endpoint
+  verifies the current password against `web_pass_sha256`, enforces an
+  8–64 character new password, and persists the new hash back to the
+  config file the server was started with — atomically (temp file +
+  rename, 0600) and without touching any other field. Because the
+  session cookie key is derived from the password hash, all existing
+  sessions are invalidated by a password change and the user is sent
+  back to the login page.
+
 ## v1.5.0 — 2026-11-08
 
 ### Changed

@@ -33,7 +33,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "server config:", err)
 			os.Exit(1)
 		}
-		runServer(cfg)
+		runServer(cfg, os.Args[2])
 	default:
 		fmt.Fprintln(os.Stderr, "unknown mode:", os.Args[1])
 		os.Exit(2)
