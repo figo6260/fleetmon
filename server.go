@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 type machineState struct {
@@ -318,25 +319,14 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		http.Redirect(w, r, base+"/login", http.StatusFound)
 	})
 
-	// persistPassSHA writes a new web_pass_sha256 back to the config file
-	// this process was started with. Only that one field changes: the file
-	// is decoded into raw JSON values so every other field (machines,
-	// token, ...) is preserved byte-for-byte, and the write is atomic
+	// Config write-back (password change, machine rename) goes through
+	// cfgWriteMu so two writers cannot interleave read-modify-write
+	// cycles on the config file.
+	var cfgWriteMu sync.Mutex
+
+	// writeConfigRaw atomically replaces the config file with raw
 	// (temp file + rename, 0600 like the original).
-	persistPassSHA := func(newSHA string) error {
-		b, err := os.ReadFile(cfgPath)
-		if err != nil {
-			return err
-		}
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(b, &raw); err != nil {
-			return err
-		}
-		v, err := json.Marshal(newSHA)
-		if err != nil {
-			return err
-		}
-		raw["web_pass_sha256"] = v
+	writeConfigRaw := func(raw map[string]json.RawMessage) error {
 		out, err := json.MarshalIndent(raw, "", "  ")
 		if err != nil {
 			return err
@@ -360,6 +350,101 @@ func runServer(cfg ServerConfig, cfgPath string) {
 			return err
 		}
 		return os.Rename(tmpName, cfgPath)
+	}
+
+	// loadConfigRaw decodes the config file into raw JSON values so a
+	// single field can be changed while every other field (machines,
+	// token, ...) is preserved.
+	loadConfigRaw := func() (map[string]json.RawMessage, error) {
+		b, err := os.ReadFile(cfgPath)
+		if err != nil {
+			return nil, err
+		}
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(b, &raw); err != nil {
+			return nil, err
+		}
+		return raw, nil
+	}
+
+	// persistPassSHA writes a new web_pass_sha256 back to the config file
+	// this process was started with. Only that one field changes.
+	persistPassSHA := func(newSHA string) error {
+		cfgWriteMu.Lock()
+		defer cfgWriteMu.Unlock()
+		raw, err := loadConfigRaw()
+		if err != nil {
+			return err
+		}
+		v, err := json.Marshal(newSHA)
+		if err != nil {
+			return err
+		}
+		raw["web_pass_sha256"] = v
+		return writeConfigRaw(raw)
+	}
+
+	// persistMachineRename writes the display_name / desc override for
+	// one machine back to the config file. Only that machine's entry
+	// changes; entries are matched by id and edited as raw JSON so all
+	// other fields and entries are preserved. A nil desc leaves the
+	// stored desc untouched; an empty desc removes the override.
+	persistMachineRename := func(id, displayName string, desc *string) error {
+		cfgWriteMu.Lock()
+		defer cfgWriteMu.Unlock()
+		raw, err := loadConfigRaw()
+		if err != nil {
+			return err
+		}
+		var entries []json.RawMessage
+		if err := json.Unmarshal(raw["machines"], &entries); err != nil {
+			return err
+		}
+		found := false
+		for i, e := range entries {
+			var probe struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(e, &probe); err != nil || probe.ID != id {
+				continue
+			}
+			var entry map[string]json.RawMessage
+			if err := json.Unmarshal(e, &entry); err != nil {
+				return err
+			}
+			v, err := json.Marshal(displayName)
+			if err != nil {
+				return err
+			}
+			entry["display_name"] = v
+			if desc != nil {
+				if *desc == "" {
+					delete(entry, "desc")
+				} else {
+					dv, err := json.Marshal(*desc)
+					if err != nil {
+						return err
+					}
+					entry["desc"] = dv
+				}
+			}
+			nb, err := json.Marshal(entry)
+			if err != nil {
+				return err
+			}
+			entries[i] = nb
+			found = true
+			break
+		}
+		if !found {
+			return fmt.Errorf("machine %s not in config", id)
+		}
+		mb, err := json.Marshal(entries)
+		if err != nil {
+			return err
+		}
+		raw["machines"] = mb
+		return writeConfigRaw(raw)
 	}
 
 	mux.HandleFunc("/api/password", auth(func(w http.ResponseWriter, r *http.Request) {
@@ -409,6 +494,109 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		fmt.Fprint(w, `{"ok":true}`)
 	}))
 
+	// Rename changes only the dashboard display layer: a display_name /
+	// desc override stored on the machine's registry entry in the config
+	// file. The machine id (the agent's identity key) and the agent's
+	// own config are never touched, and the change takes effect in
+	// /api/state immediately without a restart.
+	mux.HandleFunc("/api/machines/", auth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		rest := strings.TrimPrefix(r.URL.Path, "/api/machines/")
+		if !strings.HasSuffix(rest, "/rename") {
+			http.NotFound(w, r)
+			return
+		}
+		id := strings.TrimSuffix(rest, "/rename")
+		if id == "" || strings.Contains(id, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		var req struct {
+			DisplayName *string `json:"display_name"`
+			Description *string `json:"description"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "请求格式不对", http.StatusBadRequest)
+			return
+		}
+		badText := func(s string) string {
+			for _, ch := range s {
+				if unicode.IsControl(ch) || ch == '<' || ch == '>' {
+					return "不能包含控制字符或尖括号"
+				}
+			}
+			return ""
+		}
+		if req.DisplayName == nil {
+			http.Error(w, "显示名必填", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(*req.DisplayName)
+		if name == "" {
+			http.Error(w, "显示名不能为空", http.StatusBadRequest)
+			return
+		}
+		if len([]rune(name)) > 40 {
+			http.Error(w, "显示名最长 40 个字符", http.StatusBadRequest)
+			return
+		}
+		if why := badText(name); why != "" {
+			http.Error(w, "显示名"+why, http.StatusBadRequest)
+			return
+		}
+		var desc *string
+		if req.Description != nil {
+			d := strings.TrimSpace(*req.Description)
+			if len([]rune(d)) > 80 {
+				http.Error(w, "描述最长 80 个字符", http.StatusBadRequest)
+				return
+			}
+			if why := badText(d); why != "" {
+				http.Error(w, "描述"+why, http.StatusBadRequest)
+				return
+			}
+			desc = &d
+		}
+		s.mu.Lock()
+		info, ok := s.registry[id]
+		s.mu.Unlock()
+		if !ok {
+			http.Error(w, "没有这台机器", http.StatusNotFound)
+			return
+		}
+		oldName, oldDesc := info.DisplayName, info.Desc
+		if err := persistMachineRename(id, name, desc); err != nil {
+			fmt.Fprintln(os.Stderr, "persist rename:", err)
+			http.Error(w, "保存新名字失败", http.StatusInternalServerError)
+			return
+		}
+		s.mu.Lock()
+		info.DisplayName = name
+		if desc != nil {
+			info.Desc = *desc
+		}
+		s.registry[id] = info
+		if st, ok := s.states[id]; ok {
+			st.Info = info
+		}
+		for i := range cfg.Machines {
+			if cfg.Machines[i].ID == id {
+				cfg.Machines[i] = info
+			}
+		}
+		s.saveLocked()
+		s.mu.Unlock()
+		fmt.Fprintf(os.Stderr, "%s rename: user=%s machine=%s display_name %q -> %q desc %q -> %q\n",
+			time.Now().Format(time.RFC3339), cfg.WebUser, id, oldName, name, oldDesc, info.Desc)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true, "id": id, "display_name": name, "description": info.Desc,
+		})
+	}))
+
 	mux.HandleFunc("/", auth(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -429,6 +617,10 @@ func runServer(cfg ServerConfig, cfgPath string) {
 				st = &machineState{Info: m}
 			}
 			cp := *st
+			// The dashboard shows the effective display values: rename
+			// override first, then registry, then agent-reported.
+			cp.Info.Name = cp.Info.EffName(cp.Report)
+			cp.Info.Role = cp.Info.EffDesc(cp.Report)
 			if cp.Report != nil && cp.Report.Agent {
 				cp.Online = now-cp.LastSeen <= 180
 				cp.Alert = now-cp.LastSeen > 300

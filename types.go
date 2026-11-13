@@ -68,6 +68,43 @@ type MachineInfo struct {
 	Name  string `json:"name"`
 	Role  string `json:"role"`
 	Probe string `json:"probe,omitempty"` // optional URL for agentless external probe
+
+	// Dashboard display overrides, set by the rename action. They only
+	// change what the dashboard shows; the machine id (the agent's
+	// identity key) and the agent's own reported name/role never change.
+	DisplayName string `json:"display_name,omitempty"` // display-name override; empty = use Name
+	Desc        string `json:"desc,omitempty"`         // description override; empty = use Role
+}
+
+// EffName is the name the dashboard shows for this machine: the rename
+// override first, then the registry name, then the agent-reported name,
+// then the machine id.
+func (m MachineInfo) EffName(rep *Report) string {
+	if m.DisplayName != "" {
+		return m.DisplayName
+	}
+	if m.Name != "" {
+		return m.Name
+	}
+	if rep != nil && rep.Name != "" {
+		return rep.Name
+	}
+	return m.ID
+}
+
+// EffDesc is the description line the dashboard shows: the rename
+// override first, then the registry role, then the agent-reported role.
+func (m MachineInfo) EffDesc(rep *Report) string {
+	if m.Desc != "" {
+		return m.Desc
+	}
+	if m.Role != "" {
+		return m.Role
+	}
+	if rep != nil {
+		return rep.Role
+	}
+	return ""
 }
 
 // ServerConfig is the fleetmon server config file.
