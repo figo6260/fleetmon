@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.6.1 — 2026-11-12
+
+### Added
+
+- Login failure lockout on the dashboard: failed logins are counted
+  per source IP over a rolling 10-minute window, and 5 failures lock
+  that IP out for 30 minutes. While locked, every login from that IP
+  is refused (HTTP 429 with an explanatory message) — even with the
+  correct password. A successful login clears the counter, different
+  IPs never affect each other, established sessions and Bearer-token
+  automation are untouched, and lock events are written to the server
+  log for audit. The accounting uses the real visitor address: on the
+  production path (la-hub nginx -> reverse tunnel) nginx force-sets
+  `X-Real-IP`, which the server trusts only when the connection
+  arrives via the local tunnel endpoint; direct connections are
+  accounted to their true peer address. Counts are kept in memory
+  only, so a restart resets them.
+
 ## v1.6.0 — 2026-11-12
 
 ### Added

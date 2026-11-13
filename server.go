@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -156,6 +157,159 @@ func (s *store) pruneLoop() {
 	}
 }
 
+// ---- login failure lockout ----
+//
+// The dashboard login is the only password surface exposed to the
+// public internet, so failed logins are counted per source IP: too
+// many failures inside a rolling window lock that IP out for a fixed
+// period. While locked, every login from that IP is refused — even
+// with the correct password. A successful login clears the counter.
+// Counts live in memory only (a restart resets them), and locks for
+// different IPs are fully independent. Already-established sessions
+// and Bearer-token automation are never affected: the guard only sits
+// on the credential-checking paths (login form, HTTP Basic fallback).
+
+type ipLoginState struct {
+	fails       []time.Time // failure timestamps inside the rolling window
+	lockedUntil time.Time
+	lastLockLog time.Time
+}
+
+type loginGuard struct {
+	mu        sync.Mutex
+	threshold int           // failures inside window that trigger a lock
+	window    time.Duration // rolling failure-counting window
+	lockDur   time.Duration // how long a lock lasts
+	byIP      map[string]*ipLoginState
+}
+
+func envIntOr(name string, def int) int {
+	if v := os.Getenv(name); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
+
+// newLoginGuard builds the guard with production defaults: 5 failures
+// within 10 minutes lock the source IP for 30 minutes. The env
+// overrides exist so sandbox tests can shorten the durations; the
+// production service sets none of them.
+func newLoginGuard() *loginGuard {
+	return &loginGuard{
+		threshold: envIntOr("FLEETMON_LOGIN_LOCK_THRESHOLD", 5),
+		window:    time.Duration(envIntOr("FLEETMON_LOGIN_LOCK_WINDOW_SEC", 600)) * time.Second,
+		lockDur:   time.Duration(envIntOr("FLEETMON_LOGIN_LOCK_SEC", 1800)) * time.Second,
+		byIP:      map[string]*ipLoginState{},
+	}
+}
+
+// clientIP returns the address a login attempt is accounted to.
+//
+// In production the public path is: visitor -> la-hub nginx ->
+// reverse SSH tunnel -> this server, so requests that arrive via the
+// tunnel have a loopback RemoteAddr and carry the visitor's real
+// address in X-Real-IP, which la-hub's nginx force-sets from its own
+// peer address (a visitor cannot spoof it — nginx overwrites the
+// header; X-Forwarded-For is NOT trusted for the same reason, the
+// /fleet/ location does not set it). X-Real-IP is therefore honored
+// only when the TCP peer is loopback, i.e. the request really came
+// through the local tunnel endpoint. Any direct connection (mesh or
+// public) is accounted to its true RemoteAddr and its headers are
+// ignored.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if host == "127.0.0.1" || host == "::1" {
+		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != nil {
+			return ip.String()
+		}
+	}
+	return host
+}
+
+// locked reports whether ip is currently locked out and, if so, how
+// much lock time remains.
+func (g *loginGuard) locked(ip string) (time.Duration, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	st, ok := g.byIP[ip]
+	if !ok {
+		return 0, false
+	}
+	if rem := time.Until(st.lockedUntil); rem > 0 {
+		return rem, true
+	}
+	return 0, false
+}
+
+// noteLockedReject writes an audit line for a login rejected because
+// of an active lock, rate-limited to one line per minute per IP so a
+// persistent bot cannot flood the log.
+func (g *loginGuard) noteLockedReject(ip string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	st, ok := g.byIP[ip]
+	if !ok {
+		return
+	}
+	now := time.Now()
+	if now.Sub(st.lastLockLog) >= time.Minute {
+		st.lastLockLog = now
+		fmt.Fprintf(os.Stderr, "%s login-locked-reject: ip=%s locked_until=%s\n",
+			now.Format(time.RFC3339), ip, st.lockedUntil.Format(time.RFC3339))
+	}
+}
+
+// fail records one failed login from ip. It returns true when the IP
+// is locked after this failure (either it just tripped the threshold
+// or it was already locked).
+func (g *loginGuard) fail(ip string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	now := time.Now()
+	st, ok := g.byIP[ip]
+	if !ok {
+		st = &ipLoginState{}
+		g.byIP[ip] = st
+	}
+	if now.Before(st.lockedUntil) {
+		return true // already locked; further hits do not extend it
+	}
+	cutoff := now.Add(-g.window)
+	kept := st.fails[:0]
+	for _, t := range st.fails {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	st.fails = append(kept, now)
+	if len(st.fails) >= g.threshold {
+		st.lockedUntil = now.Add(g.lockDur)
+		st.fails = nil
+		fmt.Fprintf(os.Stderr, "%s login-lockout: ip=%s locked_for=%s after %d failures in %s\n",
+			now.Format(time.RFC3339), ip, g.lockDur, g.threshold, g.window)
+		return true
+	}
+	fmt.Fprintf(os.Stderr, "%s login-fail: ip=%s failures_in_window=%d\n",
+		now.Format(time.RFC3339), ip, len(st.fails))
+	return false
+}
+
+// success clears ip's failure record after a good login.
+func (g *loginGuard) success(ip string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if st, ok := g.byIP[ip]; ok && len(st.fails) > 0 {
+		fmt.Fprintf(os.Stderr, "%s login-success: ip=%s failure count cleared\n",
+			time.Now().Format(time.RFC3339), ip)
+	}
+	delete(g.byIP, ip)
+}
+
 func runServer(cfg ServerConfig, cfgPath string) {
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		fmt.Fprintln(os.Stderr, "data dir:", err)
@@ -171,6 +325,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 	}
 	s.load()
 	// after a restart, trust lastSeen from disk but recompute online below per request
+	guard := newLoginGuard()
 	go s.probeLoop()
 	go s.pruneLoop()
 
@@ -259,12 +414,24 @@ func runServer(cfg ServerConfig, cfgPath string) {
 				return
 			}
 			user, pass, ok := r.BasicAuth()
-			sum := sha256.Sum256([]byte(pass))
-			passOK := hex.EncodeToString(sum[:]) == getPassSHA()
-			if ok && user == cfg.WebUser && passOK &&
-				subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebUser)) == 1 {
-				h(w, r)
-				return
+			if ok {
+				// Credential attempt (as opposed to an anonymous page
+				// load): subject to the per-IP failure lockout.
+				ip := clientIP(r)
+				if _, isLocked := guard.locked(ip); isLocked {
+					guard.noteLockedReject(ip)
+					http.Error(w, "too many failed login attempts", http.StatusTooManyRequests)
+					return
+				}
+				sum := sha256.Sum256([]byte(pass))
+				passOK := hex.EncodeToString(sum[:]) == getPassSHA()
+				if user == cfg.WebUser && passOK &&
+					subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebUser)) == 1 {
+					guard.success(ip)
+					h(w, r)
+					return
+				}
+				guard.fail(ip)
 			}
 			// Page loads go to the login form; API calls just get a 401.
 			if r.URL.Path == "/" {
@@ -277,12 +444,26 @@ func runServer(cfg ServerConfig, cfgPath string) {
 
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
+			ip := clientIP(r)
+			if rem, isLocked := guard.locked(ip); isLocked {
+				// Locked out: refuse without even checking the
+				// password, so the lock cannot be bypassed by
+				// guessing right during the lock period.
+				guard.noteLockedReject(ip)
+				mins := int((rem + time.Minute - 1) / time.Minute)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusTooManyRequests)
+				msg := fmt.Sprintf(`<div class="err">这个来源刚才输错密码太多次，已被临时锁定，请约 %d 分钟后再试。</div>`, mins)
+				fmt.Fprint(w, strings.Replace(loginHTML, "{{ERR}}", msg, 1))
+				return
+			}
 			user := r.FormValue("user")
 			pass := r.FormValue("pass")
 			sum := sha256.Sum256([]byte(pass))
 			passOK := hex.EncodeToString(sum[:]) == getPassSHA()
 			if user == cfg.WebUser && passOK &&
 				subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebUser)) == 1 {
+				guard.success(ip)
 				http.SetCookie(w, &http.Cookie{
 					Name:     "fleetmon_session",
 					Value:    makeSession(),
@@ -295,6 +476,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 				http.Redirect(w, r, base+"/", http.StatusFound)
 				return
 			}
+			guard.fail(ip)
 			http.Redirect(w, r, base+"/login?e=1", http.StatusFound)
 			return
 		}
@@ -302,6 +484,9 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		errMsg := ""
 		if r.URL.Query().Get("e") == "1" {
 			errMsg = `<div class="err">用户名或密码不对，请再试一次。</div>`
+		}
+		if r.URL.Query().Get("e") == "2" {
+			errMsg = `<div class="err">这个来源刚才输错密码太多次，已被临时锁定，请稍后再试。</div>`
 		}
 		fmt.Fprint(w, strings.Replace(loginHTML, "{{ERR}}", errMsg, 1))
 	})
