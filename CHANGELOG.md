@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.5.2 — 2026-11-12
+
+### Added
+
+- Rename machines from the dashboard: every machine card gets a "改名"
+  link that opens a dialog (display name + optional description),
+  backed by a new authenticated `POST /api/machines/{id}/rename`
+  endpoint. The rename is a display-layer override only — it is stored
+  as `display_name` / `desc` on the machine's registry entry in the
+  server config (written back atomically, temp file + rename, 0600,
+  other fields and entries preserved) and takes effect in `/api/state`
+  immediately, no restart needed. The machine id — the agent's
+  identity key — and every agent's own config are never touched.
+  Display values resolve as: rename override → registry name/role →
+  agent-reported name/role. Validation: the machine must exist (404),
+  display name is required, at most 40 characters, no control
+  characters or angle brackets; description at most 80 characters.
+  The dialog is a modal overlay outside the auto-refreshed grid, so
+  the 30-second refresh cannot wipe a half-filled form.
+
 ## v1.5.1 — 2026-11-12
 
 ### Added
