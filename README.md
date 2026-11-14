@@ -33,6 +33,11 @@ with a mobile-first web dashboard.
 - Summary row: machines online, machines in alert, average CPU, fullest
   disk, and data time
 - One-click refresh; the page still auto-refreshes every 30 seconds
+- **Optional asset inventory panel**: point `assets_url` at any JSON
+  inventory API (your own cloud-account aggregator, a home-grown CMDB, …)
+  and browse the assets in a second dashboard tab with dynamic columns;
+  the source is polled in the background and a failed fetch never wipes
+  the last good data
 
 **Alerts, history, and API**
 
@@ -98,6 +103,14 @@ cp examples/server.example.json server.json   # edit: token, password hash, mach
 
 - `token`: shared secret agents must present (`openssl rand -hex 16`).
 - `web_pass_sha256`: hex SHA-256 of the dashboard password
+- `assets_url` (optional): a JSON endpoint returning an array (or
+  `{"items":[...]}`) of asset objects — e.g. your own cloud-account
+  inventory aggregator. The server polls it in the background
+  (`assets_refresh` seconds, default 300) and exposes it at `api/assets`;
+  the dashboard gains an "Assets" tab with dynamic columns. Optional
+  `assets_headers` (JSON object) adds request headers such as an
+  Authorization bearer. See docs/monitoring-stack.md for the full
+  four-layer monitoring design and examples
   (`printf %s 'your-password' | sha256sum`).
 - `machines`: the fleet registry. Entries with a `probe` URL get agentless
   HTTP probing as a fallback (skipped while a real agent is reporting).

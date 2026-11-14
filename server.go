@@ -470,7 +470,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 					Path:     cookiePath,
 					MaxAge:   30 * 24 * 3600,
 					HttpOnly: true,
-					Secure:   true,
+					Secure:   false,
 					SameSite: http.SameSiteLaxMode,
 				})
 				http.Redirect(w, r, base+"/", http.StatusFound)
@@ -498,7 +498,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 			Path:     cookiePath,
 			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   false,
 			SameSite: http.SameSiteLaxMode,
 		})
 		http.Redirect(w, r, base+"/login", http.StatusFound)
@@ -672,7 +672,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 			Path:     cookiePath,
 			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   false,
 			SameSite: http.SameSiteLaxMode,
 		})
 		w.Header().Set("Content-Type", "application/json")
@@ -816,6 +816,12 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"now": now, "machines": out})
+	}))
+
+	assets := startAssetRefresher(cfg)
+	mux.HandleFunc("/api/assets", auth(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(assets.snapshot())
 	}))
 
 	fmt.Println("fleetmon server listening on", cfg.Addr, "data:", cfg.DataDir)

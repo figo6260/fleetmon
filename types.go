@@ -128,4 +128,12 @@ type ServerConfig struct {
 	WebPassSHA  string        `json:"web_pass_sha256"` // hex sha256 of dashboard password
 	WebBasePath string        `json:"web_base_path"`   // public URL prefix when behind a stripping reverse proxy, e.g. "/fleet" (no trailing slash); "" when served at root
 	Machines    []MachineInfo `json:"machines"`        // expected fleet registry
+
+	// Optional external asset-inventory source. When AssetsURL is set the
+	// server polls it on a fixed interval and serves the parsed JSON array
+	// (or {"items":[...]}) at /api/assets; the dashboard shows an
+	// "Assets" tab rendering the items with dynamic columns.
+	AssetsURL     string            `json:"assets_url,omitempty"`
+	AssetsHeaders map[string]string `json:"assets_headers,omitempty"` // optional HTTP headers for the source (e.g. auth)
+	AssetsRefresh int               `json:"assets_refresh,omitempty"` // seconds between refreshes (default 300, min 30)
 }
