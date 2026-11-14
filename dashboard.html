@@ -74,13 +74,25 @@
   .modal .mbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:380px}
   .modal input{display:block;width:100%;background:#0f1722;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px;margin-bottom:8px;outline:none}
   .modal input:focus{border-color:var(--dim)}
+  .tabbtn{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:6px 16px;font-size:14px;cursor:pointer}
+  .tabbtn.on{background:var(--card2);color:var(--txt);border-color:var(--dim);font-weight:600}
+  #assetsview{width:100%;max-width:2560px;margin:0 auto}
+  .ameta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--dim);font-size:13px;margin-bottom:10px}
+  .atable{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .atable th{background:var(--card2);color:var(--dim);font-weight:600;text-align:left;padding:9px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+  .atable td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--txt);word-break:break-all;font-variant-numeric:tabular-nums}
+  .atable tr:last-child td{border-bottom:0}
+  .ast-pill{border-radius:999px;padding:3px 9px;font-size:12px;white-space:nowrap}
+  .ast-up{background:rgba(47,191,113,.16);color:var(--ok)}
+  .ast-stop{background:rgba(232,161,58,.16);color:var(--warn)}
+  .aerr{background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:10px}
 </style>
 </head>
 <body>
 <header>
   <h1>🖥️ 电脑舰队管理台</h1>
   <div class="sub" id="sub">加载中…</div>
-  <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a><span style="color:var(--dim);font-size:12.5px"> · </span><a href="#" onclick="togglePw();return false" style="color:var(--dim);font-size:12.5px;text-decoration:none">修改密码</a><span style="color:var(--dim);font-size:12.5px"> · FleetMon v1.6.1</span></div>
+  <div style="margin-top:4px"><a href="logout" style="color:var(--dim);font-size:12.5px;text-decoration:none">退出登录</a><span style="color:var(--dim);font-size:12.5px"> · </span><a href="#" onclick="togglePw();return false" style="color:var(--dim);font-size:12.5px;text-decoration:none">修改密码</a><span style="color:var(--dim);font-size:12.5px"> · FleetMon v1.7.0</span></div>
   <div id="pwbox" style="display:none;margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;max-width:400px">
     <div style="font-size:14px;font-weight:600;margin-bottom:8px">修改密码</div>
     <input id="pw-cur" type="password" placeholder="当前密码" autocomplete="current-password" style="display:block;width:100%;background:#0f1722;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px;margin-bottom:8px">
@@ -92,6 +104,10 @@
   <div class="summary" id="summary"></div>
   <div id="alertbar" style="display:none;margin-top:10px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.6"></div>
 </header>
+<div style="width:100%;max-width:2560px;margin:0 auto 10px;display:flex;gap:8px">
+  <button class="tabbtn on" id="tab-machines" onclick="switchView('machines')">🖥️ 机器</button>
+  <button class="tabbtn" id="tab-assets" onclick="switchView('assets')" style="display:none">📋 资产</button>
+</div>
 <div class="toolbar">
   <input id="q" type="search" placeholder="搜索机器名 / 编号 / 用途…" autocomplete="off">
   <button class="fbtn on" data-f="all">全部</button>
@@ -103,6 +119,14 @@
 </div>
 <div class="grid" id="grid"></div>
 <div class="noresult" id="noresult" style="display:none">没有匹配的机器，换个关键词或筛选条件试试。</div>
+<div id="assetsview" style="display:none">
+  <div class="ameta">
+    <span id="ameta-info">资产清单未配置</span>
+    <button class="refreshbtn" onclick="fetchAssets(true)">刷新</button>
+  </div>
+  <div id="aerr" class="aerr" style="display:none"></div>
+  <div style="overflow-x:auto"><table class="atable" id="atable"><thead id="athead"></thead><tbody id="atbody"></tbody></table></div>
+</div>
 <div class="modal" id="rnmodal">
   <div class="mbox">
     <div style="font-size:15px;font-weight:600;margin-bottom:4px">给机器改名</div>
@@ -363,6 +387,61 @@ function submitRename(){
 }
 refresh();
 setInterval(refresh, 30000);
+// ---- 资产面板：视图切换 + 动态列渲染 ----
+var curView = "machines";
+var assetsLoaded = false;
+function switchView(v){
+  curView = v;
+  document.getElementById("tab-machines").classList.toggle("on", v==="machines");
+  document.getElementById("tab-assets").classList.toggle("on", v==="assets");
+  document.getElementById("grid").style.display = v==="machines" ? "" : "none";
+  document.getElementById("noresult").style.display = "none";
+  document.querySelector(".toolbar").style.display = v==="machines" ? "" : "none";
+  document.getElementById("assetsview").style.display = v==="assets" ? "" : "none";
+  if(v==="machines"){ render(); }
+  else { fetchAssets(false); }
+}
+function fetchAssets(force){
+  fetch("api/assets").then(function(r){ if(r.status===401){ location.href="login"; throw new Error("unauth"); } return r.json(); }).then(function(d){
+    if(d.ok===false && (!d.items || !d.items.length)){
+      document.getElementById("aerr").textContent = "资产源拉取失败：" + (d.error||"未知错误");
+      document.getElementById("aerr").style.display = "";
+      return;
+    }
+    document.getElementById("aerr").style.display = "none";
+    if(d.source){ document.getElementById("tab-assets").style.display = ""; }
+    renderAssets(d);
+  }).catch(function(e){ if(String(e).indexOf("unauth")<0) console.log(e); });
+}
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function renderAssets(d){
+  var items = d.items || [];
+  var prefer = ["provider","account","name","status","public_ip","region","instance_type","charge_type","expired_time","instance_id","private_ip"];
+  var cols = [], seen = {};
+  prefer.forEach(function(k){ if(!seen[k]){ seen[k]=1; cols.push(k); } });
+  items.forEach(function(it){ Object.keys(it||{}).forEach(function(k){ if(!(k in seen)){ seen[k]=1; cols.push(k); } }); });
+  var th = cols.map(function(k){ return "<th>"+escHtml(k)+"</th>"; }).join("");
+  document.getElementById("athead").innerHTML = "<tr>"+th+"</tr>";
+  var rows = items.map(function(it){
+    return "<tr>" + cols.map(function(k){
+      var v = it[k];
+      if(v===undefined || v===null || v==="") v = "–";
+      if(typeof v==="object") v = JSON.stringify(v);
+      var cell = escHtml(v);
+      var lk = k.toLowerCase();
+      if(lk==="status" || lk==="state"){
+        var vs = String(v);
+        if(vs==="Running"||vs==="RUNNING") cell = '<span class="ast-pill ast-up">'+escHtml(vs)+'</span>';
+        else if(vs==="Stopped"||vs==="STOPPED") cell = '<span class="ast-pill ast-stop">'+escHtml(vs)+'</span>';
+      }
+      return "<td>"+cell+"</td>";
+    }).join("") + "</tr>";
+  }).join("");
+  document.getElementById("atbody").innerHTML = rows || '<tr><td colspan="'+cols.length+'" style="color:var(--dim)">清单为空</td></tr>';
+  var age = d.fetched_at ? Math.max(0, Math.floor(Date.now()/1000 - d.fetched_at)) : null;
+  document.getElementById("ameta-info").textContent =
+    "共 " + (d.count||0) + " 项" + (age!==null ? " · 数据 " + age + " 秒前拉取" : "");
+}
 </script>
 </body>
 </html>

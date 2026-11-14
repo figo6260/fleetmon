@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.7.0 — 2026-11-14
+
+### Added
+
+- Optional asset inventory panel: configure `assets_url` in the server
+  config to point at any JSON endpoint that returns an array (or an
+  object with an `items` array) of asset objects — e.g. a self-hosted
+  cloud-account inventory aggregator. The server polls the source in
+  the background (`assets_refresh` seconds, default 300; optional
+  `assets_headers` for authenticated sources), serves the parsed
+  snapshot at `api/assets`, and the dashboard gains an "Assets" tab
+  rendering the items with dynamic columns, status coloring, a fetched
+  timestamp and a manual refresh button. A failed fetch keeps the last
+  good data and shows an error banner; the source is never required —
+  without `assets_url` the tab stays hidden and nothing changes.
+- docs/monitoring-stack.md: a design note describing the four-layer
+  monitoring stack (assets / external liveness / internal resources /
+  access) FleetMon is meant to slot into, how the asset panel bridges
+  the asset layer, and the security boundaries.
+
 ## v1.6.1 — 2026-11-12
 
 ### Added
