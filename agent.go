@@ -6,11 +6,38 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
-func runAgent(cfg AgentConfig) {
+// readCurrentTask returns the machine's current assigned task from
+// current_task.txt next to the agent config: the first non-empty
+// line, trimmed, capped at 200 runes. A missing or empty file means
+// no task (the dashboard shows 待命). The file is re-read every
+// report round so a task change takes effect within one interval
+// without restarting the agent.
+func readCurrentTask(cfgPath string) string {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(cfgPath), "current_task.txt"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		r := []rune(line)
+		if len(r) > 200 {
+			line = string(r[:200])
+		}
+		return line
+	}
+	return ""
+}
+
+func runAgent(cfg AgentConfig, cfgPath string) {
 	if cfg.Interval <= 0 {
 		cfg.Interval = 60
 	}
@@ -25,6 +52,7 @@ func runAgent(cfg AgentConfig) {
 		rep.Hostname = hostname
 		rep.OS = runtime.GOOS
 		rep.Agent = true
+		rep.Task = readCurrentTask(cfgPath)
 		body, _ := json.Marshal(rep)
 		req, err := http.NewRequest(http.MethodPost, cfg.Server+"/api/report", bytes.NewReader(body))
 		if err == nil {

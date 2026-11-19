@@ -1,5 +1,68 @@
 # Changelog
 
+## v1.8.1 — 2026-11-18
+
+### Changed
+
+- Dashboard cards now share one uniform height: the grid stretches
+  every row (`grid-auto-rows: 1fr`, cards are full-height flex
+  columns) and each card's footer is pinned to the bottom, so short
+  cards simply leave blank space instead of ending early. Long
+  cards fold instead of stretching the row: "主要工作任务" shows
+  the first 8 entries and "最近启动的任务" the first 6, with the
+  rest behind an expander whose open state survives auto-refresh.
+  The task plate has a fixed minimum height and the CPU sparkline
+  keeps its height even with too few samples, so the blocks above
+  the fold line up across cards too. Rendering only — agents,
+  server API and data are unchanged.
+
+## v1.8.0 — 2026-11-17
+
+### Added
+
+- Per-machine "today" task history on the dashboard: under each
+  machine's current-task plate, a collapsible section shows today's
+  （Beijing date) completed / pending-acceptance / not-started
+  TaskBoard tasks for that machine's line, with main-line tasks listed
+  in full and secondary tasks folded into a nested expander (counts
+  always visible in the summary line, plus in-progress and stuck
+  counts). Data flow: `tools/fleet-progress-sync.py` (same 5-minute
+  run as the current-task sync, same line-mapping rules as the fleet
+  daily report) summarizes TaskBoard into `task-history.json` in the
+  server data dir; the server reads it (mtime-cached) and merges it
+  into `/api/state` as an optional per-machine `history` field plus
+  top-level `history_date` / `history_generated_at`. The history is
+  never persisted into `state.json`; a missing or corrupt file simply
+  yields no history section. Fully backward compatible: agents are
+  unchanged, old servers omit the field (new dashboard renders no
+  section), old dashboards ignore it, and the alert logic and
+  planned-offline handling are untouched. Machines without a task
+  line (bj-brain, chinatravel, la-hub, figo) get no section.
+
+## v1.7.0 — 2026-11-17
+
+### Added
+
+- Current task + progress on the dashboard: an agent reads
+  `current_task.txt` next to its config file on every report round
+  (first non-empty line, capped at 200 runes) and sends it as the new
+  optional `task` field of the report. The file format is
+  `[run|stop|block] 任务名｜进度%` (state prefix and trailing
+  percentage both optional; a missing/empty file means idle). The
+  dashboard renders a task plate under each machine's card header:
+  a fan icon that spins (CSS animation) while the state is `run`
+  and sits still and greyed for `stop` / `block` / idle, the task
+  name, a prominent percentage number and a thin progress bar.
+  Machines without a task show 「当前任务：待命」. Fully backward
+  compatible: old agents never send the field, old servers ignore
+  it, and the server's external-probe pseudo reports now inherit
+  the last agent-reported task so a down machine keeps showing its
+  last task. Companion tooling: `tools/fleet-task.sh` writes the
+  file on any machine through the existing remote channels, and
+  `tools/fleet-progress-sync.py` syncs each machine's main
+  in-progress TaskBoard task (same line-mapping rules as the fleet
+  daily report) into the file automatically.
+
 ## v1.6.1 — 2026-11-12
 
 ### Added

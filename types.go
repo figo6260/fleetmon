@@ -49,6 +49,11 @@ type Report struct {
 	Services []Service    `json:"services"`
 	Uptime   uint64       `json:"uptime"` // seconds
 	Agent    bool         `json:"agent"`  // false for external-probe pseudo reports
+	// Task is the machine's current assigned task, read by the agent
+	// from current_task.txt next to its config file (absent file =
+	// empty = idle). Convention: "任务名｜进度%" — the dashboard
+	// renders a trailing percentage as a number + progress bar.
+	Task string `json:"task,omitempty"`
 }
 
 // ServiceCheck configures one watched item on an agent.

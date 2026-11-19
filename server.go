@@ -27,6 +27,71 @@ type machineState struct {
 	Alert     bool        `json:"alert"`                // computed: offline > 5 min (always present; mailer depends on it)
 }
 
+// Task history (v1.8.0, TB-074): tools/fleet-progress-sync.py summarizes
+// TaskBoard into task-history.json in the data dir every 5 minutes; the
+// server only reads it and merges it into /api/state output so the
+// dashboard can render a per-machine "today" history section. It is
+// never written into state.json, and a missing/corrupt file simply
+// means no history section (old dashboards ignore the extra fields).
+type taskHistoryEntry struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Progress int    `json:"progress"`
+}
+
+type taskHistoryGroup struct {
+	Main []taskHistoryEntry `json:"main"`
+	Fold []taskHistoryEntry `json:"fold"`
+}
+
+type machineTaskHistory struct {
+	Inprog map[string]int               `json:"inprog"`
+	Stuck  map[string]int               `json:"stuck"`
+	Groups map[string]*taskHistoryGroup `json:"groups"`
+}
+
+type taskHistoryFile struct {
+	Date        string                         `json:"date"` // Beijing date the data describes
+	GeneratedAt int64                          `json:"generated_at"`
+	Machines    map[string]*machineTaskHistory `json:"machines"`
+}
+
+// stateOut is machineState plus the optional merged task history.
+type stateOut struct {
+	machineState
+	History *machineTaskHistory `json:"history,omitempty"`
+}
+
+type historyCache struct {
+	mu    sync.Mutex
+	mtime time.Time
+	data  *taskHistoryFile
+}
+
+func (hc *historyCache) load(dataDir string) *taskHistoryFile {
+	path := filepath.Join(dataDir, "task-history.json")
+	st, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	hc.mu.Lock()
+	defer hc.mu.Unlock()
+	if hc.data != nil && st.ModTime().Equal(hc.mtime) {
+		return hc.data
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return hc.data
+	}
+	var f taskHistoryFile
+	if json.Unmarshal(b, &f) != nil || f.Machines == nil {
+		return hc.data
+	}
+	hc.data = &f
+	hc.mtime = st.ModTime()
+	return hc.data
+}
+
 type store struct {
 	mu       sync.Mutex
 	states   map[string]*machineState
@@ -124,6 +189,11 @@ func (s *store) probeLoop() {
 				Machine: info.ID, Name: info.Name, Role: info.Role,
 				Time: time.Now().Unix(), Agent: false,
 				Services: []Service{{Name: "网站可达", Up: up, Detail: detail}},
+			}
+			// Keep showing the last task the real agent reported
+			// while the machine is down and only the probe answers.
+			if st.Report != nil && st.Report.Task != "" {
+				rep.Task = st.Report.Task
 			}
 			st.Report = rep
 			st.LastSeen = time.Now().Unix()
@@ -320,6 +390,7 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		registry[m.ID] = m
 	}
 	s := &store{states: map[string]*machineState{}, dataDir: cfg.DataDir, registry: registry}
+	histCache := &historyCache{}
 	for _, m := range cfg.Machines {
 		s.states[m.ID] = &machineState{Info: m}
 	}
@@ -792,10 +863,11 @@ func runServer(cfg ServerConfig, cfgPath string) {
 	}))
 
 	mux.HandleFunc("/api/state", auth(func(w http.ResponseWriter, r *http.Request) {
+		hist := histCache.load(cfg.DataDir) // file IO outside the store lock
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		now := time.Now().Unix()
-		out := make([]*machineState, 0, len(cfg.Machines))
+		out := make([]stateOut, 0, len(cfg.Machines))
 		for _, m := range cfg.Machines {
 			st := s.states[m.ID]
 			if st == nil {
@@ -812,10 +884,19 @@ func runServer(cfg ServerConfig, cfgPath string) {
 			} else if cp.Report != nil && !cp.Report.Agent {
 				cp.Alert = cp.DownSince > 0 && now-cp.DownSince > 300
 			}
-			out = append(out, &cp)
+			o := stateOut{machineState: cp}
+			if hist != nil {
+				o.History = hist.Machines[m.ID] // nil for machines without a task line
+			}
+			out = append(out, o)
+		}
+		resp := map[string]any{"now": now, "machines": out}
+		if hist != nil {
+			resp["history_date"] = hist.Date
+			resp["history_generated_at"] = hist.GeneratedAt
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"now": now, "machines": out})
+		json.NewEncoder(w).Encode(resp)
 	}))
 
 	fmt.Println("fleetmon server listening on", cfg.Addr, "data:", cfg.DataDir)
