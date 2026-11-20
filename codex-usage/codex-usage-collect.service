@@ -1,0 +1,8 @@
+[Unit]
+Description=Collect Codex (ChatGPT) usage quota and push to bj-brain FleetMon
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/codex-usage-collect.sh

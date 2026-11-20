@@ -119,6 +119,12 @@
   <div class="summary" id="summary"></div>
   <div id="alertbar" style="display:none;margin-top:10px;background:rgba(229,83,75,.15);border:1px solid var(--bad);color:#ffb4ae;border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.6"></div>
 </header>
+<div id="codexwrap" style="width:100%;max-width:2560px;margin:0 auto 12px;display:none">
+  <div class="card" style="cursor:default">
+    <div class="chead"><div><div class="cname" style="font-size:16px">🤖 Codex 额度</div><div class="cid" id="codexmeta">加载中…</div></div><div class="status st-off" id="codexstale" style="display:none">数据过期</div></div>
+    <div id="codexbody"></div>
+  </div>
+</div>
 <div class="toolbar">
   <input id="q" type="search" placeholder="搜索机器名 / 编号 / 用途…" autocomplete="off">
   <button class="fbtn on" data-f="all">全部</button>
@@ -476,8 +482,32 @@ function submitRename(){
     else{r.text().then(function(t){msg.textContent='保存失败：'+t.replace(/\s+$/,'');});}
   }).catch(function(){msg.textContent='保存失败：网络错误';});
 }
+/* ---- Codex 额度卡：数据来自 /api/codex-usage（us-acq 每 5 分钟采集推送） ---- */
+function codexRow(label, w){
+  if(!w)return '';
+  var rem=(typeof w.remaining_pct==='number')?w.remaining_pct:0;
+  var used=(typeof w.used_pct==='number')?w.used_pct:0;
+  var cls=rem<20?'hi':(rem<50?'mid':'');
+  return '<div class="rowlbl"><span>'+label+'</span><b>剩余 '+rem.toFixed(0)+'%（已用 '+used.toFixed(0)+'%）· '+(w.resets_in?esc(w.resets_in)+' 后重置':'')+'</b></div><div class="bar"><i class="'+cls+'" style="width:'+rem+'%"></i></div>';
+}
+function fetchCodex(){
+  fetch('api/codex-usage').then(function(r){if(r.status===401){location.href='login';throw new Error('unauth')}if(!r.ok)throw new Error('nodata');return r.json()}).then(function(d){
+    var wrap=document.getElementById('codexwrap'); wrap.style.display='block';
+    var ageS=Math.floor(Date.now()/1000)-(d.collected_at||0);
+    document.getElementById('codexbody').innerHTML=codexRow('5 小时窗口', d.win5h)+codexRow('7 天窗口', d.win7d);
+    document.getElementById('codexmeta').textContent='ChatGPT '+(d.plan||'plus')+' · 更新于 '+ago(ageS)+'（每 5 分钟采集）';
+    document.getElementById('codexstale').style.display=(ageS>900)?'block':'none';
+  }).catch(function(){
+    var wrap=document.getElementById('codexwrap'); wrap.style.display='block';
+    document.getElementById('codexbody').innerHTML='<div class="empty">暂无额度数据（采集还没跑，或已中断）。</div>';
+    document.getElementById('codexmeta').textContent='ChatGPT Plus';
+    document.getElementById('codexstale').style.display='none';
+  });
+}
 refresh();
+fetchCodex();
 setInterval(refresh, 30000);
+setInterval(fetchCodex, 60000);
 </script>
 </body>
 </html>

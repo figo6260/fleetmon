@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Codex usage collection every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=codex-usage-collect.service
+
+[Install]
+WantedBy=timers.target

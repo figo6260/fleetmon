@@ -899,6 +899,28 @@ func runServer(cfg ServerConfig, cfgPath string) {
 		json.NewEncoder(w).Encode(resp)
 	}))
 
+	// Codex quota (v1.8.2): a collector on us-acq samples the ChatGPT
+	// Codex usage windows every 5 minutes and pushes codex-usage.json
+	// next to this server's config file; the dashboard renders it as
+	// the "Codex 额度" card. Read-only: the file is served verbatim,
+	// and a missing file is a 503 with an empty object so the card can
+	// show "no data yet" instead of breaking.
+	mux.HandleFunc("/api/codex-usage", auth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(cfgPath), "codex-usage.json"))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprint(w, `{}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	}))
+
 	fmt.Println("fleetmon server listening on", cfg.Addr, "data:", cfg.DataDir)
 	srv := &http.Server{Addr: cfg.Addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	if err := srv.ListenAndServe(); err != nil {
